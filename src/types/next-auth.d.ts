@@ -7,11 +7,13 @@ declare module "next-auth" {
       name?: string | null;
       email?: string | null;
       image?: string | null;
-      discordId?: string;
       isAdmin?: boolean;
       balance?: number;
       apiKey?: string;
       plan?: string;
     };
+  }
+  interface User {
+    isAdmin?: boolean;
   }
 }

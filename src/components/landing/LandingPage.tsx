@@ -1,481 +1,266 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { useState } from "react";
 import {
-  Mail,
-  Shield,
-  Zap,
-  Globe,
-  Code,
-  ArrowRight,
-  Check,
-  Bot,
-  Key,
-  Inbox,
+  Mail, Shield, Zap, Globe, Code2, ArrowRight, Check, Bot,
+  Inbox, Lock, Cpu, Sparkles, ChevronRight, Star,
+  Copy, ExternalLink, MessageSquare, RefreshCw,
+  BarChart3, Send, Key, Webhook, Clock, EyeOff,
 } from "lucide-react";
 
 const FEATURES = [
   {
-    icon: <Inbox size={22} />,
+    icon: <Inbox size={22} />, color: "#7c3aed",
     title: "Instant Inboxes",
-    desc: "Create unlimited disposable email addresses in seconds. No credit card required.",
+    desc: "Spin up a disposable email address in one click — or via the API in milliseconds.",
   },
   {
-    icon: <Shield size={22} />,
+    icon: <Shield size={22} />, color: "#10b981",
     title: "Privacy First",
-    desc: "Keep your real inbox clean. Use temporary addresses for signups, forms, and testing.",
+    desc: "Keep your real inbox clean. Protect yourself from spam, leaks, and tracking.",
   },
   {
-    icon: <Zap size={22} />,
+    icon: <Zap size={22} />, color: "#f59e0b",
     title: "Real-time Delivery",
-    desc: "Receive emails instantly via webhooks or check your inbox through our dashboard.",
+    desc: "Emails arrive instantly. Webhook integrations notify your app the moment mail lands.",
   },
   {
-    icon: <Code size={22} />,
+    icon: <Code2 size={22} />, color: "#5865f2",
     title: "Developer API",
-    desc: "Full REST API with API key authentication. Integrate mail into any application.",
+    desc: "Full REST API with API-key auth. Inboxes, emails, and webhooks — all programmable.",
   },
   {
-    icon: <Bot size={22} />,
+    icon: <Bot size={22} />, color: "#ec4899",
     title: "Discord Bot",
-    desc: "Manage your balance and get notifications right inside your Discord server.",
+    desc: "Register and manage your account entirely from Discord. No web forms, no friction.",
   },
   {
-    icon: <Globe size={22} />,
+    icon: <Globe size={22} />, color: "#06b6d4",
     title: "Custom Domains",
-    desc: "Use your own domain or choose from our selection of available mail domains.",
+    desc: "Point your own domain at MailDrop and receive emails at any address you choose.",
+  },
+  {
+    icon: <Clock size={22} />, color: "#a78bfa",
+    title: "Auto-expiry",
+    desc: "Set TTL on inboxes so they vanish on schedule — perfect for one-time signups.",
+  },
+  {
+    icon: <EyeOff size={22} />, color: "#34d399",
+    title: "Zero Logging",
+    desc: "We don't read your emails or sell your data. Your inbox is yours, full stop.",
   },
 ];
 
 const PLANS = [
   {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    color: "#94a3b8",
-    features: ["3 inboxes", "100 emails/month", "API access", "7-day retention"],
-    cta: "Get Started",
+    name: "Free", price: "$0", period: "forever", color: "#94a3b8",
+    features: ["3 inboxes", "100 emails / month", "REST API access", "7-day retention"],
   },
   {
-    name: "Starter",
-    price: "$5",
-    period: "/ month",
-    color: "#7c3aed",
-    popular: true,
-    features: [
-      "10 inboxes",
-      "1,000 emails/month",
-      "API access",
-      "30-day retention",
-      "Webhook support",
-    ],
-    cta: "Get Started",
+    name: "Starter", price: "$5", period: "/ month", color: "#7c3aed", popular: true,
+    features: ["10 inboxes", "1,000 emails / month", "REST API + webhooks", "30-day retention"],
   },
   {
-    name: "Pro",
-    price: "$15",
-    period: "/ month",
-    color: "#10b981",
-    features: [
-      "50 inboxes",
-      "10,000 emails/month",
-      "API access",
-      "90-day retention",
-      "Priority support",
-      "Custom domain",
-    ],
-    cta: "Get Started",
+    name: "Pro", price: "$15", period: "/ month", color: "#10b981",
+    features: ["50 inboxes", "10,000 emails / month", "Priority support", "90-day retention", "Custom domain"],
   },
   {
-    name: "Enterprise",
-    price: "$50",
-    period: "/ month",
-    color: "#f59e0b",
-    features: [
-      "Unlimited inboxes",
-      "Unlimited emails",
-      "Full API access",
-      "Unlimited retention",
-      "Dedicated support",
-      "Multiple custom domains",
-    ],
-    cta: "Contact Us",
+    name: "Enterprise", price: "$50", period: "/ month", color: "#f59e0b",
+    features: ["Unlimited inboxes", "Unlimited emails", "Dedicated support", "Unlimited retention", "Multiple custom domains"],
   },
 ];
 
-const CODE_EXAMPLE = `// Create a new inbox
-const res = await fetch('https://yourdomain.com/api/mail', {
-  method: 'POST',
-  headers: {
-    'x-api-key': 'ms_your_api_key',
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({ localPart: 'myinbox' }),
-});
+const BOT_STEPS = [
+  { icon: <MessageSquare size={18} />, color: "#7c3aed", step: "01", title: 'Click "Create Account"', desc: "Press the button in the #register channel of our Discord server." },
+  { icon: <Shield size={18} />, color: "#10b981", step: "02", title: "Accept the TOS", desc: "Read and accept our Terms of Service. Your ticket opens automatically." },
+  { icon: <Key size={18} />, color: "#5865f2", step: "03", title: "Set email & password", desc: "Type your desired email and a secure password. We hash it — never stored in plain text." },
+  { icon: <Send size={18} />, color: "#f59e0b", step: "04", title: "Login on the website", desc: "We DM you the details. Log in at gootephode.me and you're ready to go." },
+];
 
-const { inbox } = await res.json();
-// { address: 'myinbox@mail.yourdomain.com', ... }`;
+const CODE_EXAMPLE = `// Create an inbox & read emails in 3 lines
+const { inbox } = await maildrop.createInbox({ localPart: "hello" });
+// → hello@mail.gootephode.me
+
+const { emails } = await maildrop.listEmails(inbox._id);
+console.log(emails[0].subject);  // "Welcome!"`;
+
+const STATS = [
+  { icon: <Inbox size={20} />, value: "50K+", label: "Inboxes created", color: "#7c3aed" },
+  { icon: <Mail size={20} />, value: "2M+", label: "Emails received", color: "#10b981" },
+  { icon: <BarChart3 size={20} />, value: "99.9%", label: "Uptime", color: "#5865f2" },
+  { icon: <RefreshCw size={20} />, value: "<50ms", label: "Avg delivery", color: "#f59e0b" },
+];
 
 export default function LandingPage() {
   const { data: session } = useSession();
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  function copyCode() {
+    navigator.clipboard.writeText(CODE_EXAMPLE);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  }
 
   return (
-    <div
-      style={{
-        background: "#0d0d14",
-        color: "#e2e8f0",
-        minHeight: "100vh",
-        fontFamily: "var(--font-geist-sans), sans-serif",
-      }}
-    >
-      {/* Navbar */}
-      <nav
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 50,
-          borderBottom: "1px solid rgba(255,255,255,0.05)",
-          background: "rgba(13,13,20,0.85)",
-          backdropFilter: "blur(12px)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: "0 auto",
-            padding: "0 1.5rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            height: 64,
-          }}
-        >
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                background: "linear-gradient(135deg, #7c3aed, #10b981)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Mail size={20} color="white" />
+    <div style={{ background: "#0d0d14", color: "#e2e8f0", minHeight: "100vh", fontFamily: "var(--font-geist-sans), sans-serif" }}>
+
+      {/* ── Nav ── */}
+      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(13,13,20,0.85)", backdropFilter: "blur(12px)", height: 62 }}>
+        <div style={{ maxWidth: 1160, margin: "0 auto", height: "100%", display: "flex", alignItems: "center", padding: "0 24px", gap: 8 }}>
+          {/* Logo */}
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none", marginRight: 28 }}>
+            <div style={{ width: 33, height: 33, borderRadius: 10, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(124,58,237,0.4)" }}>
+              <Mail size={17} color="white" />
             </div>
-            <span style={{ fontWeight: 700, fontSize: 18, color: "#e2e8f0" }}>
-              MailDrop
-            </span>
+            <span style={{ fontWeight: 800, fontSize: 16, color: "#f1f5f9", letterSpacing: "-0.01em" }}>MailDrop</span>
           </Link>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Link
-              href="/docs"
-              style={{
-                color: "#94a3b8",
-                textDecoration: "none",
-                padding: "0.4rem 0.75rem",
-                borderRadius: 8,
-                fontSize: 14,
-                transition: "color 0.2s",
-              }}
-            >
-              Docs
+
+          {/* Links */}
+          {[
+            { href: "#features", label: "Features" },
+            { href: "#how-it-works", label: "How it works" },
+            { href: "#pricing", label: "Pricing" },
+            { href: "/docs", label: "Docs" },
+          ].map((l) => (
+            <a key={l.href} href={l.href} style={{ fontSize: 14, color: "#64748b", textDecoration: "none", padding: "5px 10px", borderRadius: 7, transition: "color 0.15s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#e2e8f0")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#64748b")}
+            >{l.label}</a>
+          ))}
+
+          <div style={{ flex: 1 }} />
+
+          {session ? (
+            <Link href={session.user.isAdmin ? "/admin" : "/dashboard"} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 18px", borderRadius: 9, background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white", textDecoration: "none", fontSize: 14, fontWeight: 600, boxShadow: "0 4px 12px rgba(124,58,237,0.35)" }}>
+              Dashboard <ArrowRight size={14} />
             </Link>
-            {session ? (
-              <Link
-                href="/dashboard"
-                style={{
-                  background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                  color: "white",
-                  padding: "0.45rem 1rem",
-                  borderRadius: 8,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                Dashboard <ArrowRight size={14} />
+          ) : (
+            <>
+              <Link href="/login" style={{ fontSize: 14, color: "#94a3b8", textDecoration: "none", padding: "7px 14px", borderRadius: 9, border: "1px solid #1e1e2e", marginRight: 8, transition: "all 0.15s" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "#4b5563"; (e.currentTarget as HTMLAnchorElement).style.color = "#f1f5f9"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "#1e1e2e"; (e.currentTarget as HTMLAnchorElement).style.color = "#94a3b8"; }}
+              >Log in</Link>
+              <Link href="/login" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 18px", borderRadius: 9, background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white", textDecoration: "none", fontSize: 14, fontWeight: 600, boxShadow: "0 4px 12px rgba(124,58,237,0.35)" }}>
+                Get Started <ArrowRight size={14} />
               </Link>
-            ) : (
-              <button
-                onClick={() => signIn("discord")}
-                style={{
-                  background: "#5865f2",
-                  color: "white",
-                  padding: "0.45rem 1rem",
-                  borderRadius: 8,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 71 55" fill="white">
-                  <path d="M60.1 4.9C55.5 2.8 50.6 1.2 45.5.4c-.6 1.1-1.3 2.5-1.8 3.7C38.5 3.4 32.7 3.4 27 4.1c-.5-1.2-1.2-2.6-1.8-3.7C20.1 1.2 15.2 2.8 10.6 4.9 1.5 18.5-.9 31.7.3 44.7 6.5 49.2 12.4 51.9 18.3 53.6c1.5-2 2.8-4.1 3.9-6.3-2.2-.8-4.2-1.8-6.1-3 .5-.4 1-.7 1.5-1.1 11.8 5.4 24.6 5.4 36.2 0 .5.4 1 .7 1.5 1.1-1.9 1.2-4 2.2-6.1 3 1.1 2.2 2.4 4.3 3.9 6.3 5.9-1.7 11.8-4.4 18.1-8.9 1.4-14.5-2.4-27.6-11.1-39.8zM23.7 37.1c-3.2 0-5.8-2.9-5.8-6.5s2.6-6.5 5.8-6.5c3.2 0 5.9 2.9 5.8 6.5.1 3.5-2.5 6.5-5.8 6.5zm23.6 0c-3.2 0-5.8-2.9-5.8-6.5s2.6-6.5 5.8-6.5c3.2 0 5.9 2.9 5.8 6.5.1 3.5-2.5 6.5-5.8 6.5z" />
-                </svg>
-                Login with Discord
-              </button>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section
-        style={{
-          paddingTop: 160,
-          paddingBottom: 100,
-          paddingLeft: "1.5rem",
-          paddingRight: "1.5rem",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {/* Background gradient orbs */}
-        <div
-          style={{
-            position: "absolute",
-            top: 80,
-            left: "20%",
-            width: 500,
-            height: 500,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)",
-            filter: "blur(40px)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 200,
-            right: "10%",
-            width: 400,
-            height: 400,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)",
-            filter: "blur(40px)",
-            pointerEvents: "none",
-          }}
-        />
+      {/* ── Hero ── */}
+      <section style={{ paddingTop: 130, paddingBottom: 80, textAlign: "center", position: "relative", overflow: "hidden" }}>
+        {/* Orbs */}
+        <div style={{ position: "absolute", top: "10%", left: "20%", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 65%)", filter: "blur(60px)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "30%", right: "15%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 65%)", filter: "blur(60px)", pointerEvents: "none" }} />
 
-        <div style={{ maxWidth: 900, margin: "0 auto", textAlign: "center", position: "relative" }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              background: "rgba(124,58,237,0.1)",
-              border: "1px solid rgba(124,58,237,0.3)",
-              borderRadius: 100,
-              padding: "0.35rem 1rem",
-              fontSize: 13,
-              color: "#a78bfa",
-              marginBottom: 28,
-              fontWeight: 500,
-            }}
-          >
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#7c3aed", display: "inline-block" }} />
-            Now with Discord Bot Integration
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 24px", position: "relative", zIndex: 1 }}>
+          {/* Badge */}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: 100, padding: "6px 16px", fontSize: 13, color: "#a78bfa", marginBottom: 28, fontWeight: 500 }}>
+            <Sparkles size={13} /> Register via Discord · Launch your inboxes in seconds
           </div>
-          <h1
-            style={{
-              fontSize: "clamp(2.5rem, 6vw, 4.5rem)",
-              fontWeight: 800,
-              lineHeight: 1.1,
-              letterSpacing: "-0.02em",
-              marginBottom: 24,
-              color: "#f1f5f9",
-            }}
-          >
-            Disposable Email,{" "}
-            <span
-              style={{
-                background: "linear-gradient(135deg, #7c3aed 0%, #10b981 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              Endless Privacy
+
+          <h1 style={{ fontSize: "clamp(2.2rem, 5vw, 3.6rem)", fontWeight: 900, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#f1f5f9", marginBottom: 22 }}>
+            Disposable email{" "}
+            <span style={{ background: "linear-gradient(135deg, #7c3aed, #10b981)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              that just works
             </span>
           </h1>
-          <p
-            style={{
-              fontSize: "clamp(1rem, 2vw, 1.2rem)",
-              color: "#94a3b8",
-              lineHeight: 1.7,
-              maxWidth: 650,
-              margin: "0 auto 40px",
-            }}
-          >
-            Create temporary email addresses instantly. Perfect for developers, testers, and
-            anyone who values their privacy. No signup spam, just clean, private inboxes.
+
+          <p style={{ fontSize: "clamp(1rem, 2vw, 1.2rem)", color: "#64748b", lineHeight: 1.7, maxWidth: 560, margin: "0 auto 36px" }}>
+            Create accounts via Discord, get real inboxes, build with our API.
+            MailDrop keeps your real email safe and your app inbox-ready.
           </p>
 
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            {session ? (
-              <Link
-                href="/dashboard"
-                style={{
-                  background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                  color: "white",
-                  padding: "0.8rem 2rem",
-                  borderRadius: 12,
-                  fontSize: 16,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  boxShadow: "0 4px 20px rgba(124,58,237,0.35)",
-                }}
-              >
-                Open Dashboard <ArrowRight size={18} />
-              </Link>
-            ) : (
-              <button
-                onClick={() => signIn("discord")}
-                style={{
-                  background: "#5865f2",
-                  color: "white",
-                  padding: "0.8rem 2rem",
-                  borderRadius: 12,
-                  fontSize: 16,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  boxShadow: "0 4px 20px rgba(88,101,242,0.35)",
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 71 55" fill="white">
-                  <path d="M60.1 4.9C55.5 2.8 50.6 1.2 45.5.4c-.6 1.1-1.3 2.5-1.8 3.7C38.5 3.4 32.7 3.4 27 4.1c-.5-1.2-1.2-2.6-1.8-3.7C20.1 1.2 15.2 2.8 10.6 4.9 1.5 18.5-.9 31.7.3 44.7 6.5 49.2 12.4 51.9 18.3 53.6c1.5-2 2.8-4.1 3.9-6.3-2.2-.8-4.2-1.8-6.1-3 .5-.4 1-.7 1.5-1.1 11.8 5.4 24.6 5.4 36.2 0 .5.4 1 .7 1.5 1.1-1.9 1.2-4 2.2-6.1 3 1.1 2.2 2.4 4.3 3.9 6.3 5.9-1.7 11.8-4.4 18.1-8.9 1.4-14.5-2.4-27.6-11.1-39.8zM23.7 37.1c-3.2 0-5.8-2.9-5.8-6.5s2.6-6.5 5.8-6.5c3.2 0 5.9 2.9 5.8 6.5.1 3.5-2.5 6.5-5.8 6.5zm23.6 0c-3.2 0-5.8-2.9-5.8-6.5s2.6-6.5 5.8-6.5c3.2 0 5.9 2.9 5.8 6.5.1 3.5-2.5 6.5-5.8 6.5z" />
-                </svg>
-                Get Started Free
-              </button>
-            )}
-            <Link
-              href="/docs"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                color: "#e2e8f0",
-                padding: "0.8rem 2rem",
-                borderRadius: 12,
-                fontSize: 16,
-                fontWeight: 600,
-                textDecoration: "none",
-                border: "1px solid rgba(255,255,255,0.08)",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <Code size={18} /> View Docs
+            <Link href="/login" style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 28px", borderRadius: 12, background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white", textDecoration: "none", fontWeight: 700, fontSize: 16, boxShadow: "0 6px 24px rgba(124,58,237,0.4)", letterSpacing: "-0.01em" }}>
+              <Mail size={18} /> Start for Free
+            </Link>
+            <Link href="/docs" style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 24px", borderRadius: 12, background: "transparent", border: "1px solid #1e1e2e", color: "#94a3b8", textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
+              <Code2 size={16} /> View API Docs <ChevronRight size={14} />
             </Link>
           </div>
 
-          {/* Stats */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: "2rem",
-              marginTop: 64,
-              flexWrap: "wrap",
-            }}
-          >
-            {[
-              { value: "100K+", label: "Emails Delivered" },
-              { value: "10K+", label: "Active Users" },
-              { value: "99.9%", label: "Uptime" },
-              { value: "<1s", label: "Delivery Time" },
-            ].map((stat) => (
-              <div key={stat.label} style={{ textAlign: "center" }}>
-                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#f1f5f9" }}>
-                  {stat.value}
-                </div>
-                <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
-                  {stat.label}
-                </div>
+          {/* Social proof */}
+          <div style={{ marginTop: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {[...Array(5)].map((_, i) => <Star key={i} size={14} fill="#fbbf24" color="#fbbf24" />)}
+              <span style={{ fontSize: 13, color: "#64748b", marginLeft: 4 }}>Loved by developers</span>
+            </div>
+            <span style={{ color: "#2d2d3f" }}>·</span>
+            <span style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 5 }}>
+              <Check size={13} color="#10b981" /> Free tier, no credit card
+            </span>
+            <span style={{ color: "#2d2d3f" }}>·</span>
+            <span style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 5 }}>
+              <Lock size={13} color="#7c3aed" /> Privacy-first
+            </span>
+          </div>
+        </div>
+
+        {/* Code preview */}
+        <div style={{ maxWidth: 680, margin: "56px auto 0", padding: "0 24px", position: "relative", zIndex: 1 }}>
+          <div style={{ background: "#0a0a12", border: "1px solid #1e1e2e", borderRadius: 16, overflow: "hidden", textAlign: "left", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03)" }}>
+            {/* Title bar */}
+            <div style={{ padding: "12px 18px", borderBottom: "1px solid #1e1e2e", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", gap: 7 }}>
+                {["#ff5f57", "#febc2e", "#28c840"].map((c) => <div key={c} style={{ width: 12, height: 12, borderRadius: "50%", background: c }} />)}
               </div>
-            ))}
+              <span style={{ fontSize: 12, color: "#4b5563", marginLeft: 6, fontFamily: "var(--font-geist-mono)" }}>maildrop.ts</span>
+              <button onClick={copyCode} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: copiedCode ? "#10b981" : "#4b5563", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+                {copiedCode ? <><Check size={13} /> Copied</> : <><Copy size={13} /> Copy</>}
+              </button>
+            </div>
+            <pre style={{ margin: 0, padding: "20px 22px", fontSize: 14, lineHeight: 1.75, color: "#94a3b8", fontFamily: "var(--font-geist-mono)", overflowX: "auto", whiteSpace: "pre" }}>
+              <span style={{ color: "#64748b" }}>// Create an inbox &amp; read emails</span>{"\n"}
+              <span style={{ color: "#c084fc" }}>const</span> {"{"} inbox {"}"} <span style={{ color: "#64748b" }}>=</span> <span style={{ color: "#86efac" }}>await</span> maildrop.<span style={{ color: "#38bdf8" }}>createInbox</span>{"({ localPart: "}<span style={{ color: "#fcd34d" }}>"hello"</span>{" })"}{"\n"}
+              <span style={{ color: "#64748b" }}>// → hello@mail.gootephode.me</span>{"\n\n"}
+              <span style={{ color: "#c084fc" }}>const</span> {"{"} emails {"}"} <span style={{ color: "#64748b" }}>=</span> <span style={{ color: "#86efac" }}>await</span> maildrop.<span style={{ color: "#38bdf8" }}>listEmails</span>{"(inbox._id)"}{"\n"}
+              console.<span style={{ color: "#38bdf8" }}>log</span>{"(emails[0].subject)"}{"\n"}
+              <span style={{ color: "#64748b" }}>// "Welcome to the service!"</span>
+            </pre>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section
-        style={{
-          padding: "80px 1.5rem",
-          borderTop: "1px solid rgba(255,255,255,0.04)",
-        }}
-      >
+      {/* ── Stats ── */}
+      <section style={{ padding: "40px 24px", borderTop: "1px solid #1e1e2e", borderBottom: "1px solid #1e1e2e" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 24 }}>
+          {STATS.map((s) => (
+            <div key={s.label} style={{ textAlign: "center" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: `${s.color}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", color: s.color }}>
+                {s.icon}
+              </div>
+              <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.03em" }}>{s.value}</div>
+              <div style={{ fontSize: 13, color: "#4b5563", marginTop: 4 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Features ── */}
+      <section id="features" style={{ padding: "96px 24px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 60 }}>
-            <h2 style={{ fontSize: "2rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 12 }}>
-              Everything you need
-            </h2>
-            <p style={{ color: "#64748b", fontSize: 16 }}>
-              Powerful features for developers and privacy-conscious users alike
-            </p>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 100, padding: "5px 14px", fontSize: 12, color: "#34d399", marginBottom: 18, fontWeight: 500 }}>
+              <Cpu size={13} /> Features
+            </div>
+            <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", marginBottom: 14 }}>Everything you need</h2>
+            <p style={{ color: "#64748b", fontSize: 16, maxWidth: 500, margin: "0 auto" }}>Purpose-built for developers who need temp email without the headaches.</p>
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-              gap: 24,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
             {FEATURES.map((f) => (
-              <div
-                key={f.title}
-                style={{
-                  background: "#13131f",
-                  border: "1px solid #1e1e2e",
-                  borderRadius: 16,
-                  padding: 28,
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(124,58,237,0.4)";
-                  (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = "#1e1e2e";
-                  (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
-                }}
+              <div key={f.title}
+                style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 16, padding: "24px 22px", transition: "all 0.2s" }}
+                onMouseEnter={(e) => { const d = e.currentTarget as HTMLDivElement; d.style.borderColor = `${f.color}40`; d.style.transform = "translateY(-2px)"; d.style.boxShadow = `0 12px 30px rgba(0,0,0,0.3)`; }}
+                onMouseLeave={(e) => { const d = e.currentTarget as HTMLDivElement; d.style.borderColor = "#1e1e2e"; d.style.transform = "translateY(0)"; d.style.boxShadow = "none"; }}
               >
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    background: "rgba(124,58,237,0.15)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#a78bfa",
-                    marginBottom: 16,
-                  }}
-                >
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: `${f.color}15`, display: "flex", alignItems: "center", justifyContent: "center", color: f.color, marginBottom: 16 }}>
                   {f.icon}
                 </div>
-                <h3 style={{ fontSize: 16, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>
-                  {f.title}
-                </h3>
+                <h3 style={{ fontWeight: 700, fontSize: 16, color: "#f1f5f9", marginBottom: 8 }}>{f.title}</h3>
                 <p style={{ color: "#64748b", fontSize: 14, lineHeight: 1.6 }}>{f.desc}</p>
               </div>
             ))}
@@ -483,319 +268,119 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* API Code Example */}
-      <section
-        style={{
-          padding: "80px 1.5rem",
-          borderTop: "1px solid rgba(255,255,255,0.04)",
-        }}
-      >
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center" }}>
-          <div>
-            <div className="badge-purple" style={{ marginBottom: 20, display: "inline-block" }}>
-              Developer API
+      {/* ── How it works (bot) ── */}
+      <section id="how-it-works" style={{ padding: "80px 24px", background: "#0a0a12", borderTop: "1px solid #1e1e2e", borderBottom: "1px solid #1e1e2e" }}>
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(88,101,242,0.1)", border: "1px solid rgba(88,101,242,0.2)", borderRadius: 100, padding: "5px 14px", fontSize: 12, color: "#818cf8", marginBottom: 18, fontWeight: 500 }}>
+              <Bot size={13} /> Discord Bot
             </div>
-            <h2 style={{ fontSize: "2rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 16, lineHeight: 1.3 }}>
-              Build with our powerful REST API
-            </h2>
-            <p style={{ color: "#64748b", lineHeight: 1.7, marginBottom: 24 }}>
-              Full programmatic access to create inboxes, receive emails, and manage your account.
-              Authenticate with your API key in seconds.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                "Create & delete inboxes programmatically",
-                "Receive emails via webhook callbacks",
-                "List and read emails with pagination",
-                "API key management & regeneration",
-              ].map((item) => (
-                <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, color: "#94a3b8", fontSize: 14 }}>
-                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Check size={12} color="#10b981" />
-                  </div>
-                  {item}
-                </div>
-              ))}
-            </div>
-            <Link
-              href="/docs"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                marginTop: 28,
-                color: "#a78bfa",
-                textDecoration: "none",
-                fontWeight: 600,
-                fontSize: 14,
-              }}
-            >
-              Read Documentation <ArrowRight size={16} />
-            </Link>
+            <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", marginBottom: 14 }}>Account creation via Discord</h2>
+            <p style={{ color: "#64748b", fontSize: 16, maxWidth: 520, margin: "0 auto" }}>No email signups. No OAuth popups. A private Discord ticket creates your account in under a minute.</p>
           </div>
-          <div>
-            <div
-              style={{
-                background: "#0a0a12",
-                border: "1px solid #1e1e2e",
-                borderRadius: 16,
-                padding: 24,
-                fontFamily: "var(--font-geist-mono), monospace",
-                fontSize: 13,
-                lineHeight: 1.7,
-                overflow: "auto",
-              }}
-            >
-              <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ef4444" }} />
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#f59e0b" }} />
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#10b981" }} />
-              </div>
-              <pre style={{ margin: 0, background: "transparent", border: "none", padding: 0, color: "#e2e8f0", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                {CODE_EXAMPLE.split("\n").map((line, i) => (
-                  <div key={i}>
-                    {line
-                      .replace(/(\/\/.*)/g, '<span style="color:#4b5563">$1</span>')
-                      .replace(/('.*?')/g, '<span style="color:#10b981">$1</span>')
-                      .replace(/(const|await|fetch|JSON\.stringify|headers|method|body)/g, '<span style="color:#7c3aed">$1</span>')}
-                  </div>
-                ))}
-              </pre>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section
-        id="pricing"
-        style={{
-          padding: "80px 1.5rem",
-          borderTop: "1px solid rgba(255,255,255,0.04)",
-        }}
-      >
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 60 }}>
-            <h2 style={{ fontSize: "2rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 12 }}>
-              Simple, transparent pricing
-            </h2>
-            <p style={{ color: "#64748b", fontSize: 16 }}>
-              Fund your account and choose the plan that fits your needs
-            </p>
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: 20,
-            }}
-          >
-            {PLANS.map((plan) => (
-              <div
-                key={plan.name}
-                style={{
-                  background: "#13131f",
-                  border: `1px solid ${plan.popular ? "rgba(124,58,237,0.5)" : "#1e1e2e"}`,
-                  borderRadius: 16,
-                  padding: 28,
-                  position: "relative",
-                  boxShadow: plan.popular ? "0 0 30px rgba(124,58,237,0.15)" : "none",
-                }}
-              >
-                {plan.popular && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: -12,
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                      color: "white",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "4px 14px",
-                      borderRadius: 100,
-                      letterSpacing: "0.05em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Most Popular
-                  </div>
-                )}
-                <div
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    background: plan.color,
-                    marginBottom: 16,
-                    boxShadow: `0 0 10px ${plan.color}`,
-                  }}
-                />
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9", marginBottom: 8 }}>
-                  {plan.name}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20 }}>
+            {BOT_STEPS.map((s) => (
+              <div key={s.step} style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 16, padding: "24px 20px", position: "relative" }}>
+                <div style={{ position: "absolute", top: 18, right: 20, fontSize: 28, fontWeight: 900, color: "#1e1e2e", letterSpacing: "-0.04em", fontFamily: "var(--font-geist-mono)" }}>{s.step}</div>
+                <div style={{ width: 40, height: 40, borderRadius: 11, background: `${s.color}15`, display: "flex", alignItems: "center", justifyContent: "center", color: s.color, marginBottom: 14 }}>
+                  {s.icon}
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 20 }}>
-                  <span style={{ fontSize: "2rem", fontWeight: 800, color: "#f1f5f9" }}>
-                    {plan.price}
-                  </span>
-                  <span style={{ color: "#64748b", fontSize: 14 }}>{plan.period}</span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-                  {plan.features.map((f) => (
-                    <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, color: "#94a3b8", fontSize: 14 }}>
-                      <Check size={14} color={plan.color} />
-                      {f}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={() => signIn("discord")}
-                  style={{
-                    width: "100%",
-                    padding: "0.65rem",
-                    borderRadius: 10,
-                    fontWeight: 600,
-                    fontSize: 14,
-                    border: "none",
-                    cursor: "pointer",
-                    background: plan.popular
-                      ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
-                      : "rgba(255,255,255,0.06)",
-                    color: "white",
-                    transition: "opacity 0.2s",
-                  }}
-                >
-                  {plan.cta}
-                </button>
+                <h3 style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9", marginBottom: 8 }}>{s.title}</h3>
+                <p style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6 }}>{s.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Discord Bot Section */}
-      <section
-        style={{
-          padding: "80px 1.5rem",
-          borderTop: "1px solid rgba(255,255,255,0.04)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 800,
-            margin: "0 auto",
-            background: "linear-gradient(135deg, rgba(88,101,242,0.15), rgba(124,58,237,0.1))",
-            border: "1px solid rgba(88,101,242,0.3)",
-            borderRadius: 24,
-            padding: "48px",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
-          <h2 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 12 }}>
-            Manage with Discord Bot
-          </h2>
-          <p style={{ color: "#94a3b8", lineHeight: 1.7, maxWidth: 500, margin: "0 auto 32px" }}>
-            The owner can top up user balances directly from Discord. Users get real-time
-            notifications when their balance is updated.
-          </p>
-          <div
-            style={{
-              background: "#0a0a12",
-              borderRadius: 12,
-              padding: "16px 20px",
-              fontFamily: "var(--font-geist-mono), monospace",
-              fontSize: 14,
-              color: "#e2e8f0",
-              display: "inline-block",
-              border: "1px solid #1e1e2e",
-              textAlign: "left",
-            }}
-          >
-            <div><span style={{ color: "#7c3aed" }}>!</span>topup <span style={{ color: "#10b981" }}>@user 10</span> <span style={{ color: "#64748b" }}>// Top up $10 to user</span></div>
-            <div><span style={{ color: "#7c3aed" }}>!</span>balance <span style={{ color: "#10b981" }}>@user</span> <span style={{ color: "#64748b" }}>// Check user balance</span></div>
-            <div><span style={{ color: "#7c3aed" }}>!</span>stats <span style={{ color: "#64748b" }}>// View service stats</span></div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section style={{ padding: "80px 1.5rem", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-        <div style={{ maxWidth: 700, margin: "0 auto", textAlign: "center" }}>
-          <h2 style={{ fontSize: "2.25rem", fontWeight: 800, color: "#f1f5f9", marginBottom: 16, lineHeight: 1.3 }}>
-            Ready to protect your privacy?
-          </h2>
-          <p style={{ color: "#64748b", fontSize: 16, marginBottom: 36 }}>
-            Join thousands of users who trust MailDrop for their disposable email needs.
-          </p>
-          <button
-            onClick={() => signIn("discord")}
-            style={{
-              background: "#5865f2",
-              color: "white",
-              padding: "1rem 2.5rem",
-              borderRadius: 12,
-              fontSize: 16,
-              fontWeight: 700,
-              border: "none",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 10,
-              boxShadow: "0 4px 24px rgba(88,101,242,0.4)",
-            }}
-          >
-            <svg width="22" height="22" viewBox="0 0 71 55" fill="white">
-              <path d="M60.1 4.9C55.5 2.8 50.6 1.2 45.5.4c-.6 1.1-1.3 2.5-1.8 3.7C38.5 3.4 32.7 3.4 27 4.1c-.5-1.2-1.2-2.6-1.8-3.7C20.1 1.2 15.2 2.8 10.6 4.9 1.5 18.5-.9 31.7.3 44.7 6.5 49.2 12.4 51.9 18.3 53.6c1.5-2 2.8-4.1 3.9-6.3-2.2-.8-4.2-1.8-6.1-3 .5-.4 1-.7 1.5-1.1 11.8 5.4 24.6 5.4 36.2 0 .5.4 1 .7 1.5 1.1-1.9 1.2-4 2.2-6.1 3 1.1 2.2 2.4 4.3 3.9 6.3 5.9-1.7 11.8-4.4 18.1-8.9 1.4-14.5-2.4-27.6-11.1-39.8zM23.7 37.1c-3.2 0-5.8-2.9-5.8-6.5s2.6-6.5 5.8-6.5c3.2 0 5.9 2.9 5.8 6.5.1 3.5-2.5 6.5-5.8 6.5zm23.6 0c-3.2 0-5.8-2.9-5.8-6.5s2.6-6.5 5.8-6.5c3.2 0 5.9 2.9 5.8 6.5.1 3.5-2.5 6.5-5.8 6.5z" />
-            </svg>
-            Start for Free with Discord
-          </button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer
-        style={{
-          borderTop: "1px solid rgba(255,255,255,0.05)",
-          padding: "32px 1.5rem",
-          color: "#4b5563",
-          fontSize: 14,
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1100,
-            margin: "0 auto",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 16,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: "linear-gradient(135deg, #7c3aed, #10b981)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Mail size={14} color="white" />
+      {/* ── Pricing ── */}
+      <section id="pricing" style={{ padding: "96px 24px" }}>
+        <div style={{ maxWidth: 1060, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 100, padding: "5px 14px", fontSize: 12, color: "#a78bfa", marginBottom: 18, fontWeight: 500 }}>
+              <Sparkles size={13} /> Pricing
             </div>
-            <span style={{ color: "#94a3b8", fontWeight: 600 }}>MailDrop</span>
+            <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", marginBottom: 14 }}>Simple, transparent pricing</h2>
+            <p style={{ color: "#64748b", fontSize: 16, maxWidth: 440, margin: "0 auto" }}>Top up credits via the Discord bot. No subscriptions, no surprise bills.</p>
           </div>
-          <div style={{ display: "flex", gap: 24 }}>
-            <Link href="/docs" style={{ color: "#4b5563", textDecoration: "none" }}>Docs</Link>
-            <Link href="/dashboard" style={{ color: "#4b5563", textDecoration: "none" }}>Dashboard</Link>
-            <Link href="/login" style={{ color: "#4b5563", textDecoration: "none" }}>Login</Link>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
+            {PLANS.map((plan) => (
+              <div key={plan.name} style={{ background: "#13131f", border: `1px solid ${plan.popular ? plan.color + "50" : "#1e1e2e"}`, borderRadius: 18, padding: "28px 24px", position: "relative", boxShadow: plan.popular ? `0 8px 30px ${plan.color}20` : "none" }}>
+                {plan.popular && (
+                  <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: plan.color, color: "white", fontSize: 11, fontWeight: 700, padding: "3px 14px", borderRadius: 100, whiteSpace: "nowrap", boxShadow: `0 4px 12px ${plan.color}50` }}>
+                    Most Popular
+                  </div>
+                )}
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: plan.color, marginBottom: 14, boxShadow: `0 0 10px ${plan.color}` }} />
+                <h3 style={{ fontWeight: 800, fontSize: 18, color: "#f1f5f9", marginBottom: 6 }}>{plan.name}</h3>
+                <div style={{ marginBottom: 20 }}>
+                  <span style={{ fontSize: "2.2rem", fontWeight: 900, color: "#f1f5f9", letterSpacing: "-0.03em" }}>{plan.price}</span>
+                  <span style={{ color: "#4b5563", fontSize: 14, marginLeft: 6 }}>{plan.period}</span>
+                </div>
+                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px", display: "flex", flexDirection: "column", gap: 9 }}>
+                  {plan.features.map((f) => (
+                    <li key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#94a3b8" }}>
+                      <Check size={14} color={plan.color} style={{ flexShrink: 0 }} /> {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/login" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", borderRadius: 10, background: plan.popular ? `linear-gradient(135deg, ${plan.color}, #6d28d9)` : "transparent", border: plan.popular ? "none" : `1px solid ${plan.color}40`, color: plan.popular ? "white" : plan.color, textDecoration: "none", fontWeight: 600, fontSize: 14, transition: "all 0.15s" }}>
+                  Get Started <ArrowRight size={14} />
+                </Link>
+              </div>
+            ))}
           </div>
-          <div>© {new Date().getFullYear()} MailDrop. All rights reserved.</div>
+          <p style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "#4b5563" }}>
+            Top up via Discord · Instant activation · No credit card required for Free tier
+          </p>
+        </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section style={{ padding: "80px 24px", background: "#0a0a12", borderTop: "1px solid #1e1e2e" }}>
+        <div style={{ maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
+          <div style={{ width: 60, height: 60, borderRadius: 18, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", boxShadow: "0 8px 30px rgba(124,58,237,0.4)" }}>
+            <Mail size={28} color="white" />
+          </div>
+          <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.4rem)", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", marginBottom: 14 }}>Ready to get started?</h2>
+          <p style={{ color: "#64748b", fontSize: 16, lineHeight: 1.7, marginBottom: 32 }}>
+            Join our Discord server, click <strong style={{ color: "#94a3b8" }}>Create Account</strong>, and you&apos;re up and running in under a minute.
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <Link href="/login" style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 28px", borderRadius: 12, background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white", textDecoration: "none", fontWeight: 700, fontSize: 16, boxShadow: "0 6px 24px rgba(124,58,237,0.4)" }}>
+              <Mail size={17} /> Create Free Account
+            </Link>
+            <Link href="/docs" style={{ display: "flex", alignItems: "center", gap: 7, padding: "13px 22px", borderRadius: 12, background: "transparent", border: "1px solid #1e1e2e", color: "#94a3b8", textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
+              <ExternalLink size={15} /> Read the Docs
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer style={{ borderTop: "1px solid #1e1e2e", padding: "32px 24px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Mail size={13} color="white" />
+            </div>
+            <span style={{ fontWeight: 700, color: "#64748b", fontSize: 14 }}>MailDrop</span>
+          </div>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            {[
+              { href: "/docs", label: "API Docs", icon: <Webhook size={13} /> },
+              { href: "/dashboard", label: "Dashboard", icon: <Inbox size={13} /> },
+              { href: "/login", label: "Login", icon: <Lock size={13} /> },
+            ].map((l) => (
+              <Link key={l.href} href={l.href} style={{ fontSize: 13, color: "#4b5563", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, transition: "color 0.15s" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#4b5563")}
+              >
+                {l.icon} {l.label}
+              </Link>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, color: "#2d2d3f" }}>© {new Date().getFullYear()} MailDrop · gootephode.me</p>
         </div>
       </footer>
     </div>

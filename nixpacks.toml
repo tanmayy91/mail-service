@@ -1,0 +1,14 @@
+# ── Nixpacks build config for Railway ──────────────────────────────────
+# This file tells Nixpacks exactly how to build and run the Next.js app.
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci --legacy-peer-deps"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start"

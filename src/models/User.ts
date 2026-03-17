@@ -1,30 +1,33 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import bcrypt from "bcryptjs";
 
 export interface IUser extends Document {
-  discordId?: string;
+  _id: mongoose.Types.ObjectId;
+  email: string;
+  password: string;
   username: string;
-  email?: string;
+  discordId?: string;
   avatar?: string;
-  discriminator?: string;
   isAdmin: boolean;
   balance: number;
   apiKey: string;
   plan: "free" | "starter" | "pro" | "enterprise";
   inboxCount: number;
   emailsReceived: number;
-  createdAt: Date;
-  updatedAt: Date;
   isActive: boolean;
   lastLogin: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  comparePassword(candidate: string): Promise<boolean>;
 }
 
 const UserSchema = new Schema<IUser>(
   {
-    discordId: { type: String, unique: true, sparse: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    password: { type: String, required: true, select: false },
     username: { type: String, required: true },
-    email: { type: String, sparse: true },
+    discordId: { type: String, sparse: true },
     avatar: { type: String },
-    discriminator: { type: String },
     isAdmin: { type: Boolean, default: false },
     balance: { type: Number, default: 0, min: 0 },
     apiKey: { type: String, unique: true, required: true },
@@ -40,6 +43,15 @@ const UserSchema = new Schema<IUser>(
   },
   { timestamps: true }
 );
+
+UserSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 12);
+});
+
+UserSchema.methods.comparePassword = async function (candidate: string): Promise<boolean> {
+  return bcrypt.compare(candidate, this.password);
+};
 
 const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);

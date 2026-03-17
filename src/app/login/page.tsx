@@ -1,48 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Mail, Lock, User, AlertCircle } from "lucide-react";
+import { Mail, Lock, User, AlertCircle, Eye, EyeOff, Shield } from "lucide-react";
 import Link from "next/link";
 
 export default function LoginPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [adminMode, setAdminMode] = useState(false);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "", username: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (session) {
-      if (session.user.isAdmin) {
-        router.push("/admin");
-      } else {
-        router.push("/dashboard");
-      }
+      router.push(session.user.isAdmin ? "/admin" : "/dashboard");
     }
   }, [session, router]);
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    try {
-      const result = await signIn("admin-login", {
-        username,
-        password,
-        redirect: false,
-      });
-      if (result?.error) {
-        setError("Invalid credentials. Please try again.");
-      }
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
+
+    const result = await signIn(adminMode ? "admin-login" : "credentials", {
+      ...(adminMode
+        ? { username: form.email, password: form.password }
+        : { email: form.email, password: form.password }),
+      redirect: false,
+    });
+
+    setLoading(false);
+    if (result?.error) {
+      setError(
+        adminMode
+          ? "Invalid admin credentials."
+          : "Invalid email or password. Create your account via the Discord bot."
+      );
     }
   };
 
@@ -59,219 +56,134 @@ export default function LoginPage() {
         overflow: "hidden",
       }}
     >
-      {/* Background orbs */}
-      <div
-        style={{
-          position: "absolute",
-          top: "20%",
-          left: "30%",
-          width: 400,
-          height: 400,
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(124,58,237,0.1) 0%, transparent 70%)",
-          filter: "blur(60px)",
-          pointerEvents: "none",
-        }}
-      />
+      {/* Background glow orbs */}
+      <div style={{ position: "absolute", top: "15%", left: "25%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "10%", right: "20%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.06) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
 
-      <div style={{ width: "100%", maxWidth: 420, position: "relative" }}>
+      <div style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}>
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 14,
-                background: "linear-gradient(135deg, #7c3aed, #10b981)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Mail size={26} color="white" />
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <Link href="/" style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 12, textDecoration: "none" }}>
+            <div style={{ width: 56, height: 56, borderRadius: 18, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 32px rgba(124,58,237,0.3)" }}>
+              <Mail size={28} color="white" />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 22, color: "#f1f5f9" }}>MailDrop</span>
+            <span style={{ fontWeight: 800, fontSize: 24, color: "#f1f5f9", letterSpacing: "-0.02em" }}>MailDrop</span>
           </Link>
-          <p style={{ color: "#64748b", marginTop: 12, fontSize: 14 }}>
-            Sign in to manage your inboxes
+          <p style={{ color: "#64748b", marginTop: 8, fontSize: 14 }}>
+            {adminMode ? "Admin panel access" : "Sign in to your account"}
           </p>
         </div>
 
         {/* Card */}
-        <div
-          style={{
-            background: "#13131f",
-            border: "1px solid #1e1e2e",
-            borderRadius: 20,
-            padding: 32,
-          }}
-        >
-          {/* Tabs */}
-          <div
-            style={{
-              display: "flex",
-              background: "#0d0d14",
-              borderRadius: 12,
-              padding: 4,
-              marginBottom: 28,
-              border: "1px solid #1e1e2e",
-            }}
-          >
-            <button
-              onClick={() => setAdminMode(false)}
-              style={{
-                flex: 1,
-                padding: "0.5rem",
-                borderRadius: 9,
-                border: "none",
-                background: !adminMode ? "#7c3aed" : "transparent",
-                color: !adminMode ? "white" : "#64748b",
-                fontWeight: 600,
-                fontSize: 14,
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              User Login
-            </button>
-            <button
-              onClick={() => setAdminMode(true)}
-              style={{
-                flex: 1,
-                padding: "0.5rem",
-                borderRadius: 9,
-                border: "none",
-                background: adminMode ? "#7c3aed" : "transparent",
-                color: adminMode ? "white" : "#64748b",
-                fontWeight: 600,
-                fontSize: 14,
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              Admin Login
-            </button>
+        <div style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 24, padding: "32px 28px", boxShadow: "0 24px 64px rgba(0,0,0,0.4)" }}>
+          
+          {/* Mode toggle */}
+          <div style={{ display: "flex", background: "#0d0d14", borderRadius: 12, padding: 4, marginBottom: 28, border: "1px solid #1e1e2e" }}>
+            {[
+              { label: "User Login", icon: <Mail size={14} />, active: !adminMode, onClick: () => { setAdminMode(false); setError(""); } },
+              { label: "Admin Login", icon: <Shield size={14} />, active: adminMode, onClick: () => { setAdminMode(true); setError(""); } },
+            ].map((tab) => (
+              <button
+                key={tab.label}
+                onClick={tab.onClick}
+                style={{
+                  flex: 1, padding: "0.55rem 0.5rem", borderRadius: 9, border: "none",
+                  background: tab.active ? "#7c3aed" : "transparent",
+                  color: tab.active ? "white" : "#64748b",
+                  fontWeight: 600, fontSize: 13, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  transition: "all 0.2s",
+                }}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
           </div>
 
-          {!adminMode ? (
-            <div>
-              <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", marginBottom: 24 }}>
-                Connect your Discord account to get started
+          {/* Info banner for user mode */}
+          {!adminMode && (
+            <div style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 16 }}>💬</span>
+              <p style={{ color: "#a78bfa", fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+                Don&apos;t have an account? Join our Discord server and use the <strong>Create Account</strong> button in the registration channel.
               </p>
-              <button
-                onClick={() => signIn("discord", { callbackUrl: "/dashboard" })}
-                style={{
-                  width: "100%",
-                  background: "#5865f2",
-                  color: "white",
-                  padding: "0.85rem",
-                  borderRadius: 12,
-                  fontSize: 15,
-                  fontWeight: 700,
-                  border: "none",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                  boxShadow: "0 4px 16px rgba(88,101,242,0.3)",
-                  transition: "opacity 0.2s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-              >
-                <svg width="22" height="22" viewBox="0 0 71 55" fill="white">
-                  <path d="M60.1 4.9C55.5 2.8 50.6 1.2 45.5.4c-.6 1.1-1.3 2.5-1.8 3.7C38.5 3.4 32.7 3.4 27 4.1c-.5-1.2-1.2-2.6-1.8-3.7C20.1 1.2 15.2 2.8 10.6 4.9 1.5 18.5-.9 31.7.3 44.7 6.5 49.2 12.4 51.9 18.3 53.6c1.5-2 2.8-4.1 3.9-6.3-2.2-.8-4.2-1.8-6.1-3 .5-.4 1-.7 1.5-1.1 11.8 5.4 24.6 5.4 36.2 0 .5.4 1 .7 1.5 1.1-1.9 1.2-4 2.2-6.1 3 1.1 2.2 2.4 4.3 3.9 6.3 5.9-1.7 11.8-4.4 18.1-8.9 1.4-14.5-2.4-27.6-11.1-39.8zM23.7 37.1c-3.2 0-5.8-2.9-5.8-6.5s2.6-6.5 5.8-6.5c3.2 0 5.9 2.9 5.8 6.5.1 3.5-2.5 6.5-5.8 6.5zm23.6 0c-3.2 0-5.8-2.9-5.8-6.5s2.6-6.5 5.8-6.5c3.2 0 5.9 2.9 5.8 6.5.1 3.5-2.5 6.5-5.8 6.5z" />
-                </svg>
-                Continue with Discord
-              </button>
-              <div style={{ marginTop: 20, padding: "14px 16px", background: "rgba(124,58,237,0.08)", borderRadius: 10, border: "1px solid rgba(124,58,237,0.15)" }}>
-                <p style={{ color: "#a78bfa", fontSize: 13, textAlign: "center" }}>
-                  🔒 We only request your basic Discord profile info — no messages access
-                </p>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 18, color: "#f87171", fontSize: 13 }}>
+              <AlertCircle size={15} style={{ flexShrink: 0 }} />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Email / Username field */}
+            <div>
+              <label style={{ display: "block", fontSize: 13, color: "#94a3b8", marginBottom: 6, fontWeight: 500 }}>
+                {adminMode ? "Admin Username" : "Email Address"}
+              </label>
+              <div style={{ position: "relative" }}>
+                {adminMode
+                  ? <User size={15} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#4b5563", pointerEvents: "none" }} />
+                  : <Mail size={15} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#4b5563", pointerEvents: "none" }} />
+                }
+                <input
+                  type={adminMode ? "text" : "email"}
+                  value={form.email}
+                  onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder={adminMode ? "admin" : "you@example.com"}
+                  required
+                  style={{ paddingLeft: 38, background: "#0d0d14", border: "1px solid #1e1e2e", borderRadius: 10, padding: "0.65rem 0.75rem 0.65rem 38px", color: "#e2e8f0", fontSize: 14, width: "100%", outline: "none", transition: "border-color 0.2s" }}
+                  onFocus={(e) => e.target.style.borderColor = "#7c3aed"}
+                  onBlur={(e) => e.target.style.borderColor = "#1e1e2e"}
+                />
               </div>
             </div>
-          ) : (
-            <form onSubmit={handleAdminLogin}>
-              <p style={{ color: "#94a3b8", fontSize: 14, textAlign: "center", marginBottom: 24 }}>
-                Admin access only
-              </p>
 
-              {error && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    background: "rgba(239,68,68,0.1)",
-                    border: "1px solid rgba(239,68,68,0.3)",
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    marginBottom: 16,
-                    color: "#f87171",
-                    fontSize: 14,
-                  }}
-                >
-                  <AlertCircle size={16} />
-                  {error}
-                </div>
-              )}
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 13, color: "#94a3b8", marginBottom: 6, fontWeight: 500 }}>
-                    Username
-                  </label>
-                  <div style={{ position: "relative" }}>
-                    <User size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#4b5563" }} />
-                    <input
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="admin"
-                      required
-                      style={{ paddingLeft: 36 }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 13, color: "#94a3b8", marginBottom: 6, fontWeight: 500 }}>
-                    Password
-                  </label>
-                  <div style={{ position: "relative" }}>
-                    <Lock size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#4b5563" }} />
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                      style={{ paddingLeft: 36 }}
-                    />
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    width: "100%",
-                    background: loading ? "#4b5563" : "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                    color: "white",
-                    padding: "0.85rem",
-                    borderRadius: 12,
-                    fontSize: 15,
-                    fontWeight: 700,
-                    border: "none",
-                    cursor: loading ? "not-allowed" : "pointer",
-                    marginTop: 4,
-                  }}
-                >
-                  {loading ? "Signing in..." : "Sign in as Admin"}
+            {/* Password */}
+            <div>
+              <label style={{ display: "block", fontSize: 13, color: "#94a3b8", marginBottom: 6, fontWeight: 500 }}>Password</label>
+              <div style={{ position: "relative" }}>
+                <Lock size={15} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#4b5563", pointerEvents: "none" }} />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="••••••••"
+                  required
+                  style={{ paddingLeft: 38, paddingRight: 42, background: "#0d0d14", border: "1px solid #1e1e2e", borderRadius: 10, padding: "0.65rem 42px 0.65rem 38px", color: "#e2e8f0", fontSize: 14, width: "100%", outline: "none", transition: "border-color 0.2s" }}
+                  onFocus={(e) => e.target.style.borderColor = "#7c3aed"}
+                  onBlur={(e) => e.target.style.borderColor = "#1e1e2e"}
+                />
+                <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#4b5563", cursor: "pointer", padding: 2 }}>
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-            </form>
-          )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                marginTop: 4,
+                width: "100%",
+                background: loading ? "#1e1e2e" : "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                color: loading ? "#4b5563" : "white",
+                padding: "0.8rem",
+                borderRadius: 12,
+                fontSize: 15,
+                fontWeight: 700,
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                boxShadow: loading ? "none" : "0 4px 16px rgba(124,58,237,0.3)",
+                transition: "all 0.2s",
+              }}
+            >
+              {loading ? "Signing in…" : `Sign in${adminMode ? " as Admin" : ""}`}
+            </button>
+          </form>
         </div>
 
         <p style={{ textAlign: "center", marginTop: 20, color: "#4b5563", fontSize: 13 }}>

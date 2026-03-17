@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "eslint",
+    "bot:build": "tsc -p bot/tsconfig.json",
+    "bot:start": "tsx bot/index.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -31,6 +33,7 @@
     "react-hot-toast": "^2.6.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "tsx": "^4.21.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

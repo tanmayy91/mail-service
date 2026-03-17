@@ -1,21 +1,56 @@
 import NextAuth from "next-auth";
-import Discord from "next-auth/providers/discord";
 import Credentials from "next-auth/providers/credentials";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
-import { generateApiKey } from "@/lib/utils";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // ── trustHost ────────────────────────────────────────────────────────────
+  // REQUIRED for Railway / custom domains.
+  // NextAuth v5 reads the host from the incoming `host` / `x-forwarded-host`
+  // header. Railway reverse-proxies requests and sets x-forwarded-host to
+  // your custom domain, so trustHost:true makes OAuth callbacks and CSRF
+  // checks work correctly without hard-coding a URL.
+  trustHost: true,
+
   providers: [
-    Discord({
-      clientId: process.env.DISCORD_CLIENT_ID!,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+    // ── User login (email + password, created by Discord bot) ────────────
+    Credentials({
+      id: "credentials",
+      name: "Email / Password",
+      credentials: {
+        email:    { label: "Email",    type: "email"    },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+        try {
+          await connectDB();
+          const user = await User.findOne({ email: credentials.email })
+            .select("+password");
+          if (!user || !user.isActive) return null;
+          const valid = await user.comparePassword(credentials.password as string);
+          if (!valid) return null;
+          await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
+          return {
+            id:      user._id.toString(),
+            email:   user.email,
+            name:    user.username,
+            image:   user.avatar ?? null,
+            isAdmin: user.isAdmin,
+          };
+        } catch (err) {
+          console.error("Auth error:", err);
+          return null;
+        }
+      },
     }),
+
+    // ── Admin login (env credentials) ────────────────────────────────────
     Credentials({
       id: "admin-login",
       name: "Admin Login",
       credentials: {
-        username: { label: "Username", type: "text" },
+        username: { label: "Username", type: "text"     },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
@@ -24,9 +59,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           credentials?.password === process.env.ADMIN_PASSWORD
         ) {
           return {
-            id: "admin",
-            name: process.env.ADMIN_USERNAME,
-            email: "admin@system.local",
+            id:      "admin",
+            name:    process.env.ADMIN_USERNAME ?? "Admin",
+            email:   "admin@system.local",
             isAdmin: true,
           };
         }
@@ -34,77 +69,40 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+
   callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === "discord") {
-        try {
-          await connectDB();
-          const existing = await User.findOne({ discordId: user.id });
-          if (!existing) {
-            await User.create({
-              discordId: user.id,
-              username: user.name || "Discord User",
-              email: user.email,
-              avatar: user.image,
-              apiKey: generateApiKey(),
-              balance: 0,
-            });
-          } else {
-            await User.findOneAndUpdate(
-              { discordId: user.id },
-              {
-                username: user.name || existing.username,
-                avatar: user.image,
-                lastLogin: new Date(),
-              }
-            );
-          }
-        } catch (err) {
-          console.error("SignIn error:", err);
-          return false;
-        }
-      }
-      return true;
-    },
-    async jwt({ token, user, account }) {
-      if (account?.provider === "discord") {
-        token.discordId = token.sub;
-      }
-      if (user && "isAdmin" in user && user.isAdmin) {
-        token.isAdmin = true;
+    async jwt({ token, user }) {
+      if (user) {
+        token.id      = user.id;
+        token.isAdmin = (user as { isAdmin?: boolean }).isAdmin ?? false;
       }
       return token;
     },
     async session({ session, token }) {
-      if (token.discordId) {
+      session.user.id      = token.id      as string;
+      session.user.isAdmin = (token.isAdmin as boolean) ?? false;
+
+      if (token.id && token.id !== "admin") {
         try {
           await connectDB();
-          const dbUser = await User.findOne({ discordId: token.discordId });
+          const dbUser = await User.findById(token.id);
           if (dbUser) {
-            session.user.id = dbUser._id.toString();
-            session.user.discordId = dbUser.discordId;
-            session.user.isAdmin = dbUser.isAdmin;
             session.user.balance = dbUser.balance;
-            session.user.apiKey = dbUser.apiKey;
-            session.user.plan = dbUser.plan;
+            session.user.apiKey  = dbUser.apiKey;
+            session.user.plan    = dbUser.plan;
           }
         } catch (err) {
-          console.error("Session error:", err);
+          console.error("Session DB error:", err);
         }
-      }
-      if (token.isAdmin) {
-        session.user.isAdmin = true;
-        session.user.id = "admin";
       }
       return session;
     },
   },
+
   pages: {
     signIn: "/login",
-    error: "/login",
+    error:  "/login",
   },
-  session: {
-    strategy: "jwt",
-  },
-  secret: process.env.NEXTAUTH_SECRET,
+  session: { strategy: "jwt" },
+  secret:  process.env.NEXTAUTH_SECRET,
 });
