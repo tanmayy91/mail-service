@@ -107,15 +107,6 @@ function dbFindUser(q: Partial<UserData>): UserData | undefined {
   return db.users.find(u => entries.every(([k, v]) => u[k] === v));
 }
 
-function dbSaveUser(user: UserData): UserData {
-  const db = readDB();
-  const idx = db.users.findIndex(u => u._id === user._id);
-  const updated = { ...user, updatedAt: new Date().toISOString() };
-  if (idx >= 0) db.users[idx] = updated; else db.users.push(updated);
-  writeDB(db);
-  return updated;
-}
-
 function dbCreateUser(data: Omit<UserData, "_id" | "createdAt" | "updatedAt">): UserData {
   const now = new Date().toISOString();
   const user: UserData = { ...data, _id: uuidv4(), createdAt: now, updatedAt: now };

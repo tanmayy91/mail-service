@@ -74,14 +74,6 @@ export default function DashboardClient() {
   const [refreshing, setRefreshing] = useState(false);
   const [showNewInbox, setShowNewInbox] = useState(false);
 
-  useEffect(() => {
-    if (status === "unauthenticated") router.push("/login");
-    if (status === "authenticated") {
-      fetchProfile();
-      fetchInboxes();
-    }
-  }, [status]);
-
   async function fetchProfile() {
     const res = await fetch("/api/user/me");
     if (res.ok) { const d = await res.json(); setProfile(d.user); }
@@ -93,6 +85,15 @@ export default function DashboardClient() {
     if (res.ok) { const d = await res.json(); setInboxes(d.inboxes); }
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (status === "unauthenticated") router.push("/login");
+    if (status === "authenticated") {
+      fetchProfile();
+      fetchInboxes();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   async function fetchEmails(inboxId: string) {
     setRefreshing(true);

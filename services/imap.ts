@@ -84,8 +84,6 @@ function writeHealth(patch: Partial<ImapHealth>): void {
       connectedAt: null,
       lastActivity: null,
       lastError: null,
-      messagesProcessed,
-      updatedAt: new Date().toISOString(),
       ...existing,
       ...patch,
       messagesProcessed,
@@ -296,8 +294,6 @@ async function startService(): Promise<void> {
         const check = setInterval(() => {
           if (isShuttingDown) { clearTimeout(t); clearInterval(check); resolve(); }
         }, 500);
-        t.then?.(() => clearInterval(check));
-        // t is a NodeJS.Timeout — attach cleanup via signal
       });
 
       // Exponential back-off
