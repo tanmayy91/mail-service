@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
-import Inbox from "@/models/Inbox";
-import Email from "@/models/Email";
-import User from "@/models/User";
+import {
+  findUser,
+  findInboxById,
+  findEmails,
+  countEmails,
+  updateInbox,
+  updateUser,
+  deleteEmailsByInbox,
+} from "@/lib/db";
 
 // GET /api/mail/[id] - get emails for an inbox
 export async function GET(
@@ -14,43 +19,42 @@ export async function GET(
   const session = await auth();
   const apiKey = req.headers.get("x-api-key");
 
-  await connectDB();
-
   let userId: string;
   if (apiKey) {
-    const apiUser = await User.findOne({ apiKey });
+    const apiUser = findUser({ apiKey });
     if (!apiUser) {
       return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
     }
-    userId = apiUser._id.toString();
+    userId = apiUser._id;
   } else if (session?.user?.id) {
     userId = session.user.id;
   } else {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const inbox = await Inbox.findById(id);
+  const inbox = findInboxById(id);
   if (!inbox) {
     return NextResponse.json({ error: "Inbox not found" }, { status: 404 });
   }
 
-  if (inbox.userId.toString() !== userId) {
+  if (inbox.userId !== userId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") || "1");
+  const page  = parseInt(searchParams.get("page")  || "1");
   const limit = parseInt(searchParams.get("limit") || "20");
-  const skip = (page - 1) * limit;
+  const skip  = (page - 1) * limit;
 
-  const [emails, total] = await Promise.all([
-    Email.find({ inboxId: id })
-      .sort({ receivedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .select("-html -text -rawHeaders"),
-    Email.countDocuments({ inboxId: id }),
-  ]);
+  const allEmails = findEmails({ inboxId: id })
+    .sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+
+  const total  = allEmails.length;
+  const emails = allEmails.slice(skip, skip + limit).map(e => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { html, text, rawHeaders, ...rest } = e;
+    return rest;
+  });
 
   return NextResponse.json({ emails, total, page, limit });
 }
@@ -66,20 +70,22 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await connectDB();
-
-  const inbox = await Inbox.findById(id);
+  const inbox = findInboxById(id);
   if (!inbox) {
     return NextResponse.json({ error: "Inbox not found" }, { status: 404 });
   }
 
-  if (inbox.userId.toString() !== session.user.id && !session.user.isAdmin) {
+  if (inbox.userId !== session.user.id && !session.user.isAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await Inbox.findByIdAndUpdate(id, { isActive: false });
-  await Email.deleteMany({ inboxId: id });
-  await User.findByIdAndUpdate(inbox.userId, { $inc: { inboxCount: -1 } });
+  updateInbox(id, { isActive: false });
+  deleteEmailsByInbox(id);
+
+  const owner = findUser({ _id: inbox.userId });
+  if (owner) {
+    updateUser(owner._id, { inboxCount: Math.max(0, (owner.inboxCount || 1) - 1) });
+  }
 
   return NextResponse.json({ success: true });
 }

@@ -1,7 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { connectDB } from "@/lib/mongodb";
-import User from "@/models/User";
+import { findUser, updateUser, comparePassword } from "@/lib/db";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // ── trustHost ────────────────────────────────────────────────────────────
@@ -24,15 +23,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
         try {
-          await connectDB();
-          const user = await User.findOne({ email: credentials.email })
-            .select("+password");
+          const user = findUser({ email: (credentials.email as string).toLowerCase() });
           if (!user || !user.isActive) return null;
-          const valid = await user.comparePassword(credentials.password as string);
+          const valid = await comparePassword(user, credentials.password as string);
           if (!valid) return null;
-          await User.findByIdAndUpdate(user._id, { lastLogin: new Date() });
+          updateUser(user._id, { lastLogin: new Date().toISOString() });
           return {
-            id:      user._id.toString(),
+            id:      user._id,
             email:   user.email,
             name:    user.username,
             image:   user.avatar ?? null,
@@ -84,8 +81,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       if (token.id && token.id !== "admin") {
         try {
-          await connectDB();
-          const dbUser = await User.findById(token.id);
+          const dbUser = findUser({ _id: token.id as string });
           if (dbUser) {
             session.user.balance = dbUser.balance;
             session.user.apiKey  = dbUser.apiKey;

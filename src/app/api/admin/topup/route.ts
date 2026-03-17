@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
-import User from "@/models/User";
-import Transaction from "@/models/Transaction";
+import { findUser, updateUser, createTransaction } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -20,19 +18,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await connectDB();
-
-  const user = await User.findById(userId);
+  const user = findUser({ _id: userId });
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
   const balanceBefore = user.balance;
-  const balanceAfter = balanceBefore + amount;
+  const balanceAfter  = balanceBefore + amount;
 
-  await User.findByIdAndUpdate(userId, { balance: balanceAfter });
+  updateUser(userId, { balance: balanceAfter });
 
-  await Transaction.create({
+  createTransaction({
     userId,
     type: "topup",
     amount,
@@ -42,8 +38,5 @@ export async function POST(req: NextRequest) {
     performedBy: session.user.id,
   });
 
-  return NextResponse.json({
-    success: true,
-    newBalance: balanceAfter,
-  });
+  return NextResponse.json({ success: true, newBalance: balanceAfter });
 }

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
-import User from "@/models/User";
-import Transaction from "@/models/Transaction";
-import Inbox from "@/models/Inbox";
+import { findUser, updateUser, findInboxes, findTransactions } from "@/lib/db";
 
 export async function GET(
   req: NextRequest,
@@ -15,19 +12,20 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await connectDB();
-
-  const [user, inboxes, transactions] = await Promise.all([
-    User.findById(userId),
-    Inbox.find({ userId, isActive: true }),
-    Transaction.find({ userId }).sort({ createdAt: -1 }).limit(20),
-  ]);
-
+  const user = findUser({ _id: userId });
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ user, inboxes, transactions });
+  const inboxes = findInboxes({ userId, isActive: true });
+  const transactions = findTransactions({ userId })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 20);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...safeUser } = user;
+
+  return NextResponse.json({ user: safeUser, inboxes, transactions });
 }
 
 export async function PATCH(
@@ -40,22 +38,20 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await connectDB();
   const body = await req.json().catch(() => ({}));
 
-  const allowedFields = ["plan", "isActive", "balance"];
-  const updateData: Record<string, unknown> = {};
-
-  for (const key of allowedFields) {
-    if (key in body) {
-      updateData[key] = body[key];
-    }
+  const allowed = ["plan", "isActive", "balance"] as const;
+  const update: Partial<Record<(typeof allowed)[number], unknown>> = {};
+  for (const key of allowed) {
+    if (key in body) update[key] = body[key];
   }
 
-  const user = await User.findByIdAndUpdate(userId, updateData, { new: true });
+  const user = updateUser(userId, update as Parameters<typeof updateUser>[1]);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ user });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...safeUser } = user;
+  return NextResponse.json({ user: safeUser });
 }

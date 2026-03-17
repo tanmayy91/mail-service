@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# JSON database — do not commit production data; the directory is tracked
+/data/db.json
