@@ -44,8 +44,8 @@ interface UserData {
   balance: number;
   apiKey: string;
   plan: string;
-  inboxCount: number;
-  emailsReceived: number;
+  linkCount: number;
+  totalClicks: number;
   isActive: boolean;
   lastLogin: string;
   createdAt: string;
@@ -74,8 +74,7 @@ interface BotConfigData {
 interface DB {
   users: UserData[];
   transactions: TransactionData[];
-  inboxes: unknown[];
-  emails: unknown[];
+  links: unknown[];
   botConfigs: BotConfigData[];
 }
 
@@ -87,12 +86,11 @@ function readDB(): DB {
     return {
       users:        data.users        ?? [],
       transactions: data.transactions ?? [],
-      inboxes:      data.inboxes      ?? [],
-      emails:       data.emails       ?? [],
+      links:        data.links        ?? [],
       botConfigs:   data.botConfigs   ?? [],
     };
   } catch {
-    return { users: [], transactions: [], inboxes: [], emails: [], botConfigs: [] };
+    return { users: [], transactions: [], links: [], botConfigs: [] };
   }
 }
 
@@ -169,15 +167,14 @@ interface PlanInfo {
   label: string;
   emoji: string;
   price: number | null;
-  inboxes: number | null;
-  emailsPerMonth: number | null;
+  links: number | null;
 }
 
 const PLANS: PlanInfo[] = [
-  { key: "starter",    label: "Starter",    emoji: "⚡", price: 5,  inboxes: 10,   emailsPerMonth: 1_000  },
-  { key: "pro",        label: "Pro",        emoji: "🚀", price: 15, inboxes: 50,   emailsPerMonth: 10_000 },
-  { key: "enterprise", label: "Enterprise", emoji: "🏢", price: 50, inboxes: null, emailsPerMonth: null   },
-  { key: "custom",     label: "Custom",     emoji: "🎨", price: null, inboxes: null, emailsPerMonth: null  },
+  { key: "starter",    label: "Starter",    emoji: "⚡", price: 5,  links: 100   },
+  { key: "pro",        label: "Pro",        emoji: "🚀", price: 15, links: 500   },
+  { key: "enterprise", label: "Enterprise", emoji: "🏢", price: 50, links: null  },
+  { key: "custom",     label: "Custom",     emoji: "🎨", price: null, links: null },
 ];
 const VALID_PLANS = ["none", ...PLANS.map(p => p.key)];
 
@@ -246,19 +243,19 @@ const activeSessions = new Map<string, string>();
 function buildPanel1Embed(): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x7c3aed)
-    .setTitle("📬  Create Your MailDrop Account")
+    .setTitle("🔗  Create Your LinkDrop Account")
     .setDescription(
-      "Get instant access to disposable email inboxes.\n\n" +
+      "Get instant access to a URL shortener with click analytics.\n\n" +
       "**How it works:**\n" +
       "1️⃣  Click **Create Account** below\n" +
       "2️⃣  Accept our Terms of Service\n" +
       "3️⃣  Choose your email & password in a private ticket\n" +
-      "4️⃣  Log in at **" + WEBSITE_URL + "** and start using your inboxes!\n\n" +
+      "4️⃣  Log in at **" + WEBSITE_URL + "** and start shortening links!\n\n" +
       "> 🔒 Your credentials are **never** stored in plain text.\n" +
       "> 🕐 The ticket auto-deletes after **5 minutes**."
     )
     .setThumbnail("https://cdn.discordapp.com/embed/avatars/0.png")
-    .setFooter({ text: "MailDrop · " + WEBSITE_URL })
+    .setFooter({ text: "LinkDrop · " + WEBSITE_URL })
     .setTimestamp();
 }
 
@@ -272,7 +269,7 @@ function buildPanel1Row(): ActionRowBuilder<ButtonBuilder> {
 function buildPanel2Embed(): EmbedBuilder {
   const planLines = PLANS.map(p =>
     p.price !== null
-      ? `${p.emoji}  **${p.label}** ($${p.price}/mo) — ${p.inboxes !== null ? `${p.inboxes} inboxes · ${p.emailsPerMonth!.toLocaleString()} emails/mo` : "Unlimited"}`
+      ? `${p.emoji}  **${p.label}** ($${p.price}/mo) — ${p.links !== null ? `${p.links} links` : "Unlimited links"}`
       : `${p.emoji}  **${p.label}** — Contact staff for a tailored plan`
   ).join("\n");
 
@@ -280,12 +277,12 @@ function buildPanel2Embed(): EmbedBuilder {
     .setColor(0x10b981)
     .setTitle("💰  Credits")
     .setDescription(
-      "Add credits to unlock higher plans and more inboxes.\n\n" +
+      "Add credits to unlock higher plans and more short links.\n\n" +
       "**Plans:**\n" + planLines + "\n\n" +
-      "New accounts start with **no plan** — purchase one to unlock inboxes.\n" +
+      "New accounts start with **no plan** — purchase one to unlock links.\n" +
       `Use \`${PREFIX}balance\` to check your current balance.`
     )
-    .setFooter({ text: "MailDrop · " + WEBSITE_URL })
+    .setFooter({ text: "LinkDrop · " + WEBSITE_URL })
     .setTimestamp();
 }
 
@@ -308,10 +305,10 @@ function buildTosEmbed(): EmbedBuilder {
     .setColor(0x5865f2)
     .setTitle("📄  Terms of Service")
     .setDescription(
-      "By using MailDrop you agree to:\n\n" +
-      "• Not use the service for spam or illegal activity\n" +
+      "By using LinkDrop you agree to:\n\n" +
+      "• Not use the service for spam, phishing, or illegal activity\n" +
       "• Not share your credentials with others\n" +
-      "• Accept that temporary inboxes may expire\n" +
+      "• Accept that links may expire or be deactivated\n" +
       "• Understand that the service is provided as-is\n\n" +
       "Do you **accept** these terms?"
     );
@@ -402,7 +399,7 @@ client.on("messageCreate", async (message: Message) => {
       return void message.reply("Usage: `.credit @user <amount>`");
     }
     const user = dbFindUser({ discordId: mention.id });
-    if (!user) return void message.reply("❌ That user doesn't have a MailDrop account. Use `.creditbyemail <email> <amount>` instead.");
+    if (!user) return void message.reply("❌ That user doesn't have a LinkDrop account. Use `.creditbyemail <email> <amount>` instead.");
     const before = user.balance;
     const updated = dbUpdateUser(user._id, { balance: before + amount })!;
     dbCreateTransaction({ userId: user._id, type: "topup", amount, balanceBefore: before, balanceAfter: updated.balance, description: `Admin credit: $${amount}`, performedBy: message.author.tag });
@@ -410,8 +407,8 @@ client.on("messageCreate", async (message: Message) => {
     try {
       await mention.send({ embeds: [
         new EmbedBuilder().setColor(0x10b981).setTitle("💰 Balance Credited")
-          .setDescription(`Your MailDrop balance has been credited **$${amount}**!\n\nNew balance: **$${updated.balance.toFixed(2)}**\n\n[Visit Dashboard](${WEBSITE_URL}/dashboard)`)
-          .setFooter({ text: "MailDrop · " + WEBSITE_URL }).setTimestamp()
+          .setDescription(`Your LinkDrop balance has been credited **$${amount}**!\n\nNew balance: **$${updated.balance.toFixed(2)}**\n\n[Visit Dashboard](${WEBSITE_URL}/dashboard)`)
+          .setFooter({ text: "LinkDrop · " + WEBSITE_URL }).setTimestamp()
       ]});
     } catch { /* DMs disabled */ }
 
@@ -443,7 +440,7 @@ client.on("messageCreate", async (message: Message) => {
       return void message.reply("Usage: `.deduct @user <amount>`");
     }
     const user = dbFindUser({ discordId: mention.id });
-    if (!user) return void message.reply("❌ That user doesn't have a MailDrop account linked.");
+    if (!user) return void message.reply("❌ That user doesn't have a LinkDrop account linked.");
     const before   = user.balance;
     const newBal   = Math.max(0, before - amount);
     const deducted = before - newBal;
@@ -453,8 +450,8 @@ client.on("messageCreate", async (message: Message) => {
     try {
       await mention.send({ embeds: [
         new EmbedBuilder().setColor(0xef4444).setTitle("💸 Balance Deducted")
-          .setDescription(`**$${deducted.toFixed(2)}** has been deducted from your MailDrop balance.\n\nNew balance: **$${updated.balance.toFixed(2)}**\n\n[Visit Dashboard](${WEBSITE_URL}/dashboard)`)
-          .setFooter({ text: "MailDrop · " + WEBSITE_URL }).setTimestamp()
+          .setDescription(`**$${deducted.toFixed(2)}** has been deducted from your LinkDrop balance.\n\nNew balance: **$${updated.balance.toFixed(2)}**\n\n[Visit Dashboard](${WEBSITE_URL}/dashboard)`)
+          .setFooter({ text: "LinkDrop · " + WEBSITE_URL }).setTimestamp()
       ]});
     } catch { /* DMs disabled */ }
 
@@ -488,25 +485,25 @@ client.on("messageCreate", async (message: Message) => {
     else if (args[0])  user = dbFindUser({ email: args[0].toLowerCase() });
     else return void message.reply("Usage: `.lookup @user` or `.lookup <email>`");
 
-    if (!user) return void message.reply("❌ No MailDrop account found.");
+    if (!user) return void message.reply("❌ No LinkDrop account found.");
     const txCount = dbCountTransactions(user._id);
     const embed = new EmbedBuilder()
       .setColor(0x7c3aed)
       .setTitle("🔍 Account Lookup")
       .addFields(
-        { name: "👤 Username",        value: user.username,                         inline: true  },
-        { name: "📧 Email",           value: user.email,                            inline: true  },
-        { name: "💰 Balance",         value: `$${user.balance.toFixed(2)}`,         inline: true  },
-        { name: "📋 Plan",            value: user.plan,                             inline: true  },
-        { name: "📬 Inboxes",         value: user.inboxCount.toString(),            inline: true  },
-        { name: "📩 Emails Received", value: user.emailsReceived.toString(),        inline: true  },
-        { name: "🔑 API Key",         value: `\`${user.apiKey}\``,                  inline: false },
-        { name: "🏦 Transactions",    value: txCount.toString(),                    inline: true  },
-        { name: "✅ Active",          value: user.isActive ? "Yes" : "No",          inline: true  },
-        { name: "🛡️ Admin",          value: user.isAdmin  ? "Yes" : "No",          inline: true  },
-        { name: "📅 Joined",          value: new Date(user.createdAt).toUTCString(), inline: false },
+        { name: "👤 Username",       value: user.username,                         inline: true  },
+        { name: "📧 Email",          value: user.email,                            inline: true  },
+        { name: "💰 Balance",        value: `$${user.balance.toFixed(2)}`,         inline: true  },
+        { name: "📋 Plan",           value: user.plan,                             inline: true  },
+        { name: "🔗 Links Created",  value: user.linkCount.toString(),             inline: true  },
+        { name: "👆 Total Clicks",   value: user.totalClicks.toString(),           inline: true  },
+        { name: "🔑 API Key",        value: `\`${user.apiKey}\``,                  inline: false },
+        { name: "🏦 Transactions",   value: txCount.toString(),                    inline: true  },
+        { name: "✅ Active",         value: user.isActive ? "Yes" : "No",          inline: true  },
+        { name: "🛡️ Admin",         value: user.isAdmin  ? "Yes" : "No",          inline: true  },
+        { name: "📅 Joined",         value: new Date(user.createdAt).toUTCString(), inline: false },
       )
-      .setFooter({ text: "MailDrop · " + WEBSITE_URL })
+      .setFooter({ text: "LinkDrop · " + WEBSITE_URL })
       .setTimestamp();
     return void message.reply({ embeds: [embed] });
   }
@@ -515,28 +512,28 @@ client.on("messageCreate", async (message: Message) => {
   if (command === "balance") {
     const target = message.mentions.users.first() ?? message.author;
     const user   = dbFindUser({ discordId: target.id });
-    if (!user) return void message.reply(`❌ No MailDrop account linked to ${target.tag}.`);
+    if (!user) return void message.reply(`❌ No LinkDrop account linked to ${target.tag}.`);
     return void message.reply(`💳 **${user.username}** (${user.email}) — Balance: **$${user.balance.toFixed(2)}** | Plan: **${user.plan}**`);
   }
 
   // ── .stats ────────────────────────────────
   if (command === "stats") {
     if (!isOwner) return message.reply("❌ Owner only.");
-    const db         = readDB();
-    const users      = dbCountUsers();
-    const inboxes    = (db.inboxes as Array<{ isActive?: boolean }>).filter(i => i.isActive).length;
-    const emails     = (db.emails as unknown[]).length;
-    const bal        = dbTotalBalance();
+    const db       = readDB();
+    const users    = dbCountUsers();
+    const links    = (db.links as Array<{ isActive?: boolean }>).filter(l => l.isActive).length;
+    const clicks   = (db.links as Array<{ clicks?: number }>).reduce((s, l) => s + (l.clicks ?? 0), 0);
+    const bal      = dbTotalBalance();
     const embed = new EmbedBuilder()
       .setColor(0x7c3aed)
-      .setTitle("📊 MailDrop Stats")
+      .setTitle("📊 LinkDrop Stats")
       .addFields(
-        { name: "👥 Users",           value: users.toString(),          inline: true },
-        { name: "📬 Active Inboxes",  value: inboxes.toString(),        inline: true },
-        { name: "📧 Emails Received", value: emails.toString(),         inline: true },
-        { name: "💰 Total Balance",   value: `$${bal.toFixed(2)}`,      inline: true },
+        { name: "👥 Users",        value: users.toString(),     inline: true },
+        { name: "🔗 Active Links", value: links.toString(),     inline: true },
+        { name: "👆 Total Clicks", value: clicks.toString(),    inline: true },
+        { name: "💰 Total Balance", value: `$${bal.toFixed(2)}`, inline: true },
       )
-      .setFooter({ text: "MailDrop · " + WEBSITE_URL })
+      .setFooter({ text: "LinkDrop · " + WEBSITE_URL })
       .setTimestamp();
     return void message.reply({ embeds: [embed] });
   }
@@ -573,7 +570,7 @@ client.on("messageCreate", async (message: Message) => {
   if (command === "help") {
     const embed = new EmbedBuilder()
       .setColor(0x7c3aed)
-      .setTitle("🤖 MailDrop Bot Commands")
+      .setTitle("🤖 LinkDrop Bot Commands")
       .setDescription(`Prefix: \`${PREFIX}\``)
       .addFields(
         { name: "User Commands", value:
@@ -592,7 +589,7 @@ client.on("messageCreate", async (message: Message) => {
             `\`${PREFIX}stats\` — View statistics\n` +
             `\`${PREFIX}backup\` — Send DB backup to backup channel` },
       )
-      .setFooter({ text: "MailDrop · " + WEBSITE_URL });
+      .setFooter({ text: "LinkDrop · " + WEBSITE_URL });
     return void message.reply({ embeds: [embed] });
   }
 });
@@ -643,7 +640,7 @@ client.on("interactionCreate", async (interaction) => {
 
     const existingUser = dbFindUser({ discordId: btn.user.id });
     if (existingUser) {
-      await btn.reply({ content: `✅ You already have a MailDrop account!\n📧 Email: \`${existingUser.email}\`\n🌐 Login at ${WEBSITE_URL}`, ephemeral: true });
+      await btn.reply({ content: `✅ You already have a LinkDrop account!\n📧 Email: \`${existingUser.email}\`\n🌐 Login at ${WEBSITE_URL}`, ephemeral: true });
       return;
     }
 
@@ -690,7 +687,7 @@ client.on("interactionCreate", async (interaction) => {
         new EmbedBuilder()
           .setColor(0x7c3aed)
           .setTitle("📝 Account Registration")
-          .setDescription("Welcome! Let's set up your MailDrop account.\n\n**Step 1 of 2:** Please type the **email address** you want to use for your account.")
+          .setDescription("Welcome! Let's set up your LinkDrop account.\n\n**Step 1 of 2:** Please type the **email address** you want to use for your account.")
           .setFooter({ text: "This ticket will be deleted automatically in 5 minutes after account creation." }),
       ],
     });
@@ -743,28 +740,28 @@ client.on("interactionCreate", async (interaction) => {
         const apiKey         = generateApiKey();
         const member         = btn.member as GuildMember;
         const newUser        = dbCreateUser({
-          email:          collectedEmail,
-          password:       hashedPassword,
-          username:       member?.displayName ?? btn.user.username,
-          discordId:      btn.user.id,
-          avatar:         btn.user.displayAvatarURL(),
+          email:       collectedEmail,
+          password:    hashedPassword,
+          username:    member?.displayName ?? btn.user.username,
+          discordId:   btn.user.id,
+          avatar:      btn.user.displayAvatarURL(),
           apiKey,
-          balance:        0,
-          plan:           "none",
-          isAdmin:        false,
-          inboxCount:     0,
-          emailsReceived: 0,
-          isActive:       true,
-          lastLogin:      new Date().toISOString(),
+          balance:     0,
+          plan:        "none",
+          isAdmin:     false,
+          linkCount:   0,
+          totalClicks: 0,
+          isActive:    true,
+          lastLogin:   new Date().toISOString(),
         });
 
         const welcomeEmbed = new EmbedBuilder()
           .setColor(0x7c3aed)
-          .setTitle("🎉 Welcome to MailDrop!")
+          .setTitle("🎉 Welcome to LinkDrop!")
           .setDescription(
             `Your account has been created successfully!\n\n` +
             `**Login at:** ${WEBSITE_URL}\n\n` +
-            `�� **Email:** \`${collectedEmail}\`\n` +
+            `📧 **Email:** \`${collectedEmail}\`\n` +
             `🔑 **Your API Key:** \`${apiKey}\`\n` +
             `💰 **Credits:** $${newUser.balance.toFixed(2)}\n` +
             `📋 **Plan:** ${newUser.plan}\n\n` +
@@ -772,7 +769,7 @@ client.on("interactionCreate", async (interaction) => {
             `> ⚠️ Your plan is currently **none** — use \`${PREFIX}calc\` to see what you can buy, then ask staff to assign a plan.`
           )
           .setThumbnail(btn.user.displayAvatarURL())
-          .setFooter({ text: "MailDrop · " + WEBSITE_URL })
+          .setFooter({ text: "LinkDrop · " + WEBSITE_URL })
           .setTimestamp();
 
         try {
@@ -791,7 +788,7 @@ client.on("interactionCreate", async (interaction) => {
           embeds: [
             new EmbedBuilder().setColor(0x10b981).setTitle("✅ Account Created!")
               .setDescription(`Your account is ready!\n\n📬 Check your DMs for login details.\n🌐 Log in at: ${WEBSITE_URL}\n\n⏰ This ticket will be **deleted in 5 minutes**.`)
-              .setFooter({ text: "MailDrop Registration" }),
+              .setFooter({ text: "LinkDrop Registration" }),
           ],
         });
 
@@ -812,23 +809,23 @@ client.on("interactionCreate", async (interaction) => {
     return;
   }
 
-  // ── Check Balance (Panel 2) ───────────────
   if (btn.customId === "check_balance") {
     const user = dbFindUser({ discordId: btn.user.id });
     if (!user) {
-      await btn.reply({ content: `❌ No MailDrop account found. Create one using the registration panel!\n🌐 ${WEBSITE_URL}`, ephemeral: true });
+      await btn.reply({ content: `❌ No LinkDrop account found. Create one using the registration panel!\n🌐 ${WEBSITE_URL}`, ephemeral: true });
       return;
     }
     await btn.reply({
       embeds: [
         new EmbedBuilder().setColor(0x10b981).setTitle("💳 Your Balance")
           .addFields(
-            { name: "Balance", value: `$${user.balance.toFixed(2)}`, inline: true },
-            { name: "Plan",    value: user.plan,                     inline: true },
-            { name: "Email",   value: user.email,                    inline: true },
-            { name: "API Key", value: `\`${user.apiKey}\``,          inline: false },
+            { name: "Balance",      value: `$${user.balance.toFixed(2)}`, inline: true },
+            { name: "Plan",         value: user.plan,                     inline: true },
+            { name: "Email",        value: user.email,                    inline: true },
+            { name: "Links Created", value: user.linkCount.toString(),    inline: true },
+            { name: "API Key",      value: `\`${user.apiKey}\``,          inline: false },
           )
-          .setFooter({ text: "MailDrop · " + WEBSITE_URL })
+          .setFooter({ text: "LinkDrop · " + WEBSITE_URL })
       ],
       ephemeral: true,
     });
@@ -839,12 +836,12 @@ client.on("interactionCreate", async (interaction) => {
   if (btn.customId === "view_plans") {
     await btn.reply({
       embeds: [
-        new EmbedBuilder().setColor(0x7c3aed).setTitle("📊 MailDrop Plans")
+        new EmbedBuilder().setColor(0x7c3aed).setTitle("📊 LinkDrop Plans")
           .addFields(
-            { name: "🆓 Free",       value: "3 inboxes · 100 emails/mo · $0",        inline: false },
-            { name: "⚡ Starter",    value: "10 inboxes · 1 000 emails/mo · $5/mo",  inline: false },
-            { name: "🚀 Pro",        value: "50 inboxes · 10 000 emails/mo · $15/mo", inline: false },
-            { name: "🏢 Enterprise", value: "Unlimited · $50/mo",                    inline: false },
+            { name: "🆓 Free",       value: "10 links · $0",        inline: false },
+            { name: "⚡ Starter",    value: "100 links · $5/mo",    inline: false },
+            { name: "🚀 Pro",        value: "500 links · $15/mo",   inline: false },
+            { name: "🏢 Enterprise", value: "Unlimited · $50/mo",   inline: false },
           )
           .setFooter({ text: "Top up via the owner or contact staff" }),
       ],

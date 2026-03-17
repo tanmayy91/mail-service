@@ -4,9 +4,9 @@ import { Providers } from "@/components/Providers";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "MailDrop — Temporary Email Service",
+  title: "LinkDrop — URL Shortener",
   description:
-    "Create disposable email addresses instantly. Protect your privacy with MailDrop.",
+    "Shorten URLs, track clicks in real time. LinkDrop — the developer-friendly URL shortener with Discord bot integration.",
   keywords: ["temporary email", "disposable email", "temp mail"],
 };
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, User, AlertCircle, Eye, EyeOff, Shield } from "lucide-react";
+import { Link2, Lock, User, AlertCircle, Eye, EyeOff, Shield } from "lucide-react";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -65,9 +65,9 @@ export default function LoginPage() {
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <Link href="/" style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 12, textDecoration: "none" }}>
             <div style={{ width: 56, height: 56, borderRadius: 18, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 32px rgba(124,58,237,0.3)" }}>
-              <Mail size={28} color="white" />
+              <Link2 size={28} color="white" />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 24, color: "#f1f5f9", letterSpacing: "-0.02em" }}>MailDrop</span>
+            <span style={{ fontWeight: 800, fontSize: 24, color: "#f1f5f9", letterSpacing: "-0.02em" }}>LinkDrop</span>
           </Link>
           <p style={{ color: "#64748b", marginTop: 8, fontSize: 14 }}>
             {adminMode ? "Admin panel access" : "Sign in to your account"}
@@ -80,7 +80,7 @@ export default function LoginPage() {
           {/* Mode toggle */}
           <div style={{ display: "flex", background: "#0d0d14", borderRadius: 12, padding: 4, marginBottom: 28, border: "1px solid #1e1e2e" }}>
             {[
-              { label: "User Login", icon: <Mail size={14} />, active: !adminMode, onClick: () => { setAdminMode(false); setError(""); } },
+              { label: "User Login", icon: <Link2 size={14} />, active: !adminMode, onClick: () => { setAdminMode(false); setError(""); } },
               { label: "Admin Login", icon: <Shield size={14} />, active: adminMode, onClick: () => { setAdminMode(true); setError(""); } },
             ].map((tab) => (
               <button
@@ -127,7 +127,7 @@ export default function LoginPage() {
               <div style={{ position: "relative" }}>
                 {adminMode
                   ? <User size={15} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#4b5563", pointerEvents: "none" }} />
-                  : <Mail size={15} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#4b5563", pointerEvents: "none" }} />
+                  : <Link2 size={15} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#4b5563", pointerEvents: "none" }} />
                 }
                 <input
                   type={adminMode ? "text" : "email"}

@@ -4,32 +4,32 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 import {
-  Mail, Shield, Zap, Globe, Code2, ArrowRight, Check, Bot,
-  Inbox, Lock, Cpu, Sparkles, ChevronRight, Star,
-  Copy, ExternalLink, MessageSquare, RefreshCw,
-  BarChart3, Send, Key, Webhook, Clock, EyeOff,
+  Link2, Shield, Zap, Globe, Code2, ArrowRight, Check, Bot,
+  Lock, Cpu, Sparkles, ChevronRight, Star,
+  Copy, MessageSquare,
+  BarChart3, Key, MousePointer2, EyeOff, Scissors,
 } from "lucide-react";
 
 const FEATURES = [
   {
-    icon: <Inbox size={22} />, color: "#7c3aed",
-    title: "Instant Inboxes",
-    desc: "Spin up a disposable email address in one click — or via the API in milliseconds.",
+    icon: <Scissors size={22} />, color: "#7c3aed",
+    title: "Instant Short Links",
+    desc: "Shorten any URL in one click — or via the API in milliseconds. Custom slugs supported.",
   },
   {
     icon: <Shield size={22} />, color: "#10b981",
     title: "Privacy First",
-    desc: "Keep your real inbox clean. Protect yourself from spam, leaks, and tracking.",
+    desc: "No tracking pixels. No selling your data. Links are yours, full stop.",
   },
   {
-    icon: <Zap size={22} />, color: "#f59e0b",
-    title: "Real-time Delivery",
-    desc: "Emails arrive instantly. Webhook integrations notify your app the moment mail lands.",
+    icon: <BarChart3 size={22} />, color: "#f59e0b",
+    title: "Click Analytics",
+    desc: "Track how many times each link has been clicked in real time from your dashboard.",
   },
   {
     icon: <Code2 size={22} />, color: "#5865f2",
     title: "Developer API",
-    desc: "Full REST API with API-key auth. Inboxes, emails, and webhooks — all programmable.",
+    desc: "Full REST API with API-key auth. Create, list, and delete links programmatically.",
   },
   {
     icon: <Bot size={22} />, color: "#ec4899",
@@ -38,37 +38,37 @@ const FEATURES = [
   },
   {
     icon: <Globe size={22} />, color: "#06b6d4",
-    title: "Custom Domains",
-    desc: "Point your own domain at MailDrop and receive emails at any address you choose.",
+    title: "Custom Slugs",
+    desc: "Make your links memorable — choose a custom slug or let us generate one for you.",
   },
   {
-    icon: <Clock size={22} />, color: "#a78bfa",
-    title: "Auto-expiry",
-    desc: "Set TTL on inboxes so they vanish on schedule — perfect for one-time signups.",
+    icon: <MousePointer2 size={22} />, color: "#a78bfa",
+    title: "Fast Redirects",
+    desc: "302 redirects served edge-fast with zero lag so your users never wait.",
   },
   {
     icon: <EyeOff size={22} />, color: "#34d399",
-    title: "Zero Logging",
-    desc: "We don't read your emails or sell your data. Your inbox is yours, full stop.",
+    title: "Expiring Links",
+    desc: "Set an expiry date on any link — great for time-limited offers or one-time pages.",
   },
 ];
 
 const PLANS = [
   {
     name: "Free", price: "$0", period: "forever", color: "#94a3b8",
-    features: ["3 inboxes", "100 emails / month", "REST API access", "7-day retention"],
+    features: ["10 short links", "Click analytics", "REST API access", "Custom slugs"],
   },
   {
     name: "Starter", price: "$5", period: "/ month", color: "#7c3aed", popular: true,
-    features: ["10 inboxes", "1,000 emails / month", "REST API + webhooks", "30-day retention"],
+    features: ["100 short links", "Full click analytics", "REST API + custom slugs", "Link expiry"],
   },
   {
     name: "Pro", price: "$15", period: "/ month", color: "#10b981",
-    features: ["50 inboxes", "10,000 emails / month", "Priority support", "90-day retention", "Custom domain"],
+    features: ["500 short links", "Priority support", "Advanced analytics", "Bulk operations"],
   },
   {
     name: "Enterprise", price: "$50", period: "/ month", color: "#f59e0b",
-    features: ["Unlimited inboxes", "Unlimited emails", "Dedicated support", "Unlimited retention", "Multiple custom domains"],
+    features: ["Unlimited links", "Unlimited analytics", "Dedicated support", "Custom domain"],
   },
 ];
 
@@ -76,21 +76,24 @@ const BOT_STEPS = [
   { icon: <MessageSquare size={18} />, color: "#7c3aed", step: "01", title: 'Click "Create Account"', desc: "Press the button in the #register channel of our Discord server." },
   { icon: <Shield size={18} />, color: "#10b981", step: "02", title: "Accept the TOS", desc: "Read and accept our Terms of Service. Your ticket opens automatically." },
   { icon: <Key size={18} />, color: "#5865f2", step: "03", title: "Set email & password", desc: "Type your desired email and a secure password. We hash it — never stored in plain text." },
-  { icon: <Send size={18} />, color: "#f59e0b", step: "04", title: "Login on the website", desc: "We DM you the details. Log in at gootephode.me and you're ready to go." },
+  { icon: <Link2 size={18} />, color: "#f59e0b", step: "04", title: "Start shortening", desc: "We DM you the details. Log in at the website and create your first short link!" },
 ];
 
-const CODE_EXAMPLE = `// Create an inbox & read emails in 3 lines
-const { inbox } = await maildrop.createInbox({ localPart: "hello" });
-// → hello@mail.gootephode.me
-
-const { emails } = await maildrop.listEmails(inbox._id);
-console.log(emails[0].subject);  // "Welcome!"`;
+const CODE_EXAMPLE = `// Shorten a URL & get the short link
+const res = await fetch("https://your-domain.com/api/links", {
+  method: "POST",
+  headers: { "x-api-key": "ld_...", "Content-Type": "application/json" },
+  body: JSON.stringify({ url: "https://very-long-url.com/path?q=1", slug: "my-link" }),
+});
+const { link } = await res.json();
+console.log(link.slug);  // "my-link"
+// → https://your-domain.com/api/r/my-link`;
 
 const STATS = [
-  { icon: <Inbox size={20} />, value: "50K+", label: "Inboxes created", color: "#7c3aed" },
-  { icon: <Mail size={20} />, value: "2M+", label: "Emails received", color: "#10b981" },
+  { icon: <Link2 size={20} />, value: "50K+", label: "Links shortened", color: "#7c3aed" },
+  { icon: <MousePointer2 size={20} />, value: "2M+", label: "Clicks tracked", color: "#10b981" },
   { icon: <BarChart3 size={20} />, value: "99.9%", label: "Uptime", color: "#5865f2" },
-  { icon: <RefreshCw size={20} />, value: "<50ms", label: "Avg delivery", color: "#f59e0b" },
+  { icon: <Zap size={20} />, value: "<20ms", label: "Avg redirect", color: "#f59e0b" },
 ];
 
 export default function LandingPage() {
@@ -112,9 +115,9 @@ export default function LandingPage() {
           {/* Logo */}
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none", marginRight: 28 }}>
             <div style={{ width: 33, height: 33, borderRadius: 10, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(124,58,237,0.4)" }}>
-              <Mail size={17} color="white" />
+              <Link2 size={17} color="white" />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 16, color: "#f1f5f9", letterSpacing: "-0.01em" }}>MailDrop</span>
+            <span style={{ fontWeight: 800, fontSize: 16, color: "#f1f5f9", letterSpacing: "-0.01em" }}>LinkDrop</span>
           </Link>
 
           {/* Links */}
@@ -159,24 +162,24 @@ export default function LandingPage() {
         <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 24px", position: "relative", zIndex: 1 }}>
           {/* Badge */}
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: 100, padding: "6px 16px", fontSize: 13, color: "#a78bfa", marginBottom: 28, fontWeight: 500 }}>
-            <Sparkles size={13} /> Register via Discord · Launch your inboxes in seconds
+            <Sparkles size={13} /> Register via Discord · Shorten links in seconds
           </div>
 
           <h1 style={{ fontSize: "clamp(2.2rem, 5vw, 3.6rem)", fontWeight: 900, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#f1f5f9", marginBottom: 22 }}>
-            Disposable email{" "}
+            URL shortening{" "}
             <span style={{ background: "linear-gradient(135deg, #7c3aed, #10b981)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              that just works
+              with click analytics
             </span>
           </h1>
 
           <p style={{ fontSize: "clamp(1rem, 2vw, 1.2rem)", color: "#64748b", lineHeight: 1.7, maxWidth: 560, margin: "0 auto 36px" }}>
-            Create accounts via Discord, get real inboxes, build with our API.
-            MailDrop keeps your real email safe and your app inbox-ready.
+            Create accounts via Discord, shorten any URL, and track clicks in real time.
+            LinkDrop is the developer-friendly URL shortener with a full REST API.
           </p>
 
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <Link href="/login" style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 28px", borderRadius: 12, background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white", textDecoration: "none", fontWeight: 700, fontSize: 16, boxShadow: "0 6px 24px rgba(124,58,237,0.4)", letterSpacing: "-0.01em" }}>
-              <Mail size={18} /> Start for Free
+              <Link2 size={18} /> Start for Free
             </Link>
             <Link href="/docs" style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 24px", borderRadius: 12, background: "transparent", border: "1px solid #1e1e2e", color: "#94a3b8", textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
               <Code2 size={16} /> View API Docs <ChevronRight size={14} />
@@ -208,18 +211,21 @@ export default function LandingPage() {
               <div style={{ display: "flex", gap: 7 }}>
                 {["#ff5f57", "#febc2e", "#28c840"].map((c) => <div key={c} style={{ width: 12, height: 12, borderRadius: "50%", background: c }} />)}
               </div>
-              <span style={{ fontSize: 12, color: "#4b5563", marginLeft: 6, fontFamily: "var(--font-geist-mono)" }}>maildrop.ts</span>
+              <span style={{ fontSize: 12, color: "#4b5563", marginLeft: 6, fontFamily: "var(--font-geist-mono)" }}>linkdrop.ts</span>
               <button onClick={copyCode} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: copiedCode ? "#10b981" : "#4b5563", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
                 {copiedCode ? <><Check size={13} /> Copied</> : <><Copy size={13} /> Copy</>}
               </button>
             </div>
-            <pre style={{ margin: 0, padding: "20px 22px", fontSize: 14, lineHeight: 1.75, color: "#94a3b8", fontFamily: "var(--font-geist-mono)", overflowX: "auto", whiteSpace: "pre" }}>
-              <span style={{ color: "#64748b" }}>{"// Create an inbox & read emails"}</span>{"\n"}
-              <span style={{ color: "#c084fc" }}>const</span> {"{"} inbox {"}"} <span style={{ color: "#64748b" }}>=</span> <span style={{ color: "#86efac" }}>await</span> maildrop.<span style={{ color: "#38bdf8" }}>createInbox</span>{"({ localPart: "}<span style={{ color: "#fcd34d" }}>{'"hello"'}</span>{" })"}{"\n"}
-              <span style={{ color: "#64748b" }}>{"// → hello@novacloud.tech"}</span>{"\n\n"}
-              <span style={{ color: "#c084fc" }}>const</span> {"{"} emails {"}"} <span style={{ color: "#64748b" }}>=</span> <span style={{ color: "#86efac" }}>await</span> maildrop.<span style={{ color: "#38bdf8" }}>listEmails</span>{"(inbox._id)"}{"\n"}
-              console.<span style={{ color: "#38bdf8" }}>log</span>{"(emails[0].subject)"}{"\n"}
-              <span style={{ color: "#64748b" }}>{'// "Welcome to the service!"'}</span>
+            <pre style={{ margin: 0, padding: "20px 22px", fontSize: 13, lineHeight: 1.75, color: "#94a3b8", fontFamily: "var(--font-geist-mono)", overflowX: "auto", whiteSpace: "pre" }}>
+              <span style={{ color: "#64748b" }}>{"// Shorten a URL & get the short link"}</span>{"\n"}
+              <span style={{ color: "#c084fc" }}>const</span>{" res = "}<span style={{ color: "#86efac" }}>await</span>{" fetch("}
+              <span style={{ color: "#fcd34d" }}>{'"…/api/links"'}</span>{", {\n"}
+              {"  method: "}<span style={{ color: "#fcd34d" }}>{'"POST"'}</span>{",\n"}
+              {"  headers: { "}<span style={{ color: "#fcd34d" }}>{'"x-api-key"'}</span>{": "}<span style={{ color: "#fcd34d" }}>{'"ld_…"'}</span>{" },\n"}
+              {"  body: JSON.stringify({ url: "}<span style={{ color: "#fcd34d" }}>{'"https://very-long-url.com"'}</span>{" }),\n"}{");\n"}
+              <span style={{ color: "#c084fc" }}>const</span>{" { link } = "}<span style={{ color: "#86efac" }}>await</span>{" res.json();\n"}
+              {"console."}<span style={{ color: "#38bdf8" }}>{"log"}</span>{"(link.slug);\n"}
+              <span style={{ color: "#64748b" }}>{'// → "my-link"'}</span>
             </pre>
           </div>
         </div>
@@ -248,7 +254,7 @@ export default function LandingPage() {
               <Cpu size={13} /> Features
             </div>
             <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", marginBottom: 14 }}>Everything you need</h2>
-            <p style={{ color: "#64748b", fontSize: 16, maxWidth: 500, margin: "0 auto" }}>Purpose-built for developers who need temp email without the headaches.</p>
+            <p style={{ color: "#64748b", fontSize: 16, maxWidth: 500, margin: "0 auto" }}>Purpose-built for developers who need a reliable, fast, and private URL shortener.</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
             {FEATURES.map((f) => (
@@ -298,91 +304,59 @@ export default function LandingPage() {
         <div style={{ maxWidth: 1060, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 56 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 100, padding: "5px 14px", fontSize: 12, color: "#a78bfa", marginBottom: 18, fontWeight: 500 }}>
-              <Sparkles size={13} /> Pricing
+              <Star size={13} /> Pricing
             </div>
             <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", marginBottom: 14 }}>Simple, transparent pricing</h2>
-            <p style={{ color: "#64748b", fontSize: 16, maxWidth: 440, margin: "0 auto" }}>Top up credits via the Discord bot. No subscriptions, no surprise bills.</p>
+            <p style={{ color: "#64748b", fontSize: 16, maxWidth: 480, margin: "0 auto" }}>Start free, upgrade when you need more links. All plans include click analytics and API access.</p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
-            {PLANS.map((plan) => (
-              <div key={plan.name} style={{ background: "#13131f", border: `1px solid ${plan.popular ? plan.color + "50" : "#1e1e2e"}`, borderRadius: 18, padding: "28px 24px", position: "relative", boxShadow: plan.popular ? `0 8px 30px ${plan.color}20` : "none" }}>
-                {plan.popular && (
-                  <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: plan.color, color: "white", fontSize: 11, fontWeight: 700, padding: "3px 14px", borderRadius: 100, whiteSpace: "nowrap", boxShadow: `0 4px 12px ${plan.color}50` }}>
-                    Most Popular
-                  </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 20 }}>
+            {PLANS.map((p) => (
+              <div key={p.name} style={{ background: p.popular ? "linear-gradient(145deg, #13131f, #1a1225)" : "#13131f", border: `1px solid ${p.popular ? p.color + "50" : "#1e1e2e"}`, borderRadius: 18, padding: "28px 24px", position: "relative", boxShadow: p.popular ? `0 0 40px ${p.color}20` : "none" }}>
+                {p.popular && (
+                  <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: p.color, borderRadius: 100, padding: "3px 14px", fontSize: 11, fontWeight: 700, color: "white", letterSpacing: "0.04em" }}>POPULAR</div>
                 )}
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: plan.color, marginBottom: 14, boxShadow: `0 0 10px ${plan.color}` }} />
-                <h3 style={{ fontWeight: 800, fontSize: 18, color: "#f1f5f9", marginBottom: 6 }}>{plan.name}</h3>
-                <div style={{ marginBottom: 20 }}>
-                  <span style={{ fontSize: "2.2rem", fontWeight: 900, color: "#f1f5f9", letterSpacing: "-0.03em" }}>{plan.price}</span>
-                  <span style={{ color: "#4b5563", fontSize: 14, marginLeft: 6 }}>{plan.period}</span>
-                </div>
-                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px", display: "flex", flexDirection: "column", gap: 9 }}>
-                  {plan.features.map((f) => (
-                    <li key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#94a3b8" }}>
-                      <Check size={14} color={plan.color} style={{ flexShrink: 0 }} /> {f}
+                <div style={{ fontSize: 15, fontWeight: 700, color: p.color, marginBottom: 6 }}>{p.name}</div>
+                <div style={{ fontSize: "2rem", fontWeight: 900, color: "#f1f5f9", letterSpacing: "-0.04em", marginBottom: 2 }}>{p.price}</div>
+                <div style={{ fontSize: 13, color: "#4b5563", marginBottom: 22 }}>{p.period}</div>
+                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {p.features.map((feat) => (
+                    <li key={feat} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 14, color: "#94a3b8" }}>
+                      <Check size={14} color={p.color} strokeWidth={2.5} /> {feat}
                     </li>
                   ))}
                 </ul>
-                <Link href="/login" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", borderRadius: 10, background: plan.popular ? `linear-gradient(135deg, ${plan.color}, #6d28d9)` : "transparent", border: plan.popular ? "none" : `1px solid ${plan.color}40`, color: plan.popular ? "white" : plan.color, textDecoration: "none", fontWeight: 600, fontSize: 14, transition: "all 0.15s" }}>
-                  Get Started <ArrowRight size={14} />
+                <Link href="/login" style={{ display: "block", textAlign: "center", padding: "10px", borderRadius: 10, background: p.popular ? `linear-gradient(135deg, ${p.color}, ${p.color}cc)` : "transparent", border: p.popular ? "none" : `1px solid ${p.color}40`, color: p.popular ? "white" : p.color, textDecoration: "none", fontWeight: 600, fontSize: 14 }}>
+                  Get started
                 </Link>
               </div>
             ))}
-          </div>
-          <p style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "#4b5563" }}>
-            Top up via Discord · Instant activation · No credit card required for Free tier
-          </p>
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section style={{ padding: "80px 24px", background: "#0a0a12", borderTop: "1px solid #1e1e2e" }}>
-        <div style={{ maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
-          <div style={{ width: 60, height: 60, borderRadius: 18, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", boxShadow: "0 8px 30px rgba(124,58,237,0.4)" }}>
-            <Mail size={28} color="white" />
-          </div>
-          <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.4rem)", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", marginBottom: 14 }}>Ready to get started?</h2>
-          <p style={{ color: "#64748b", fontSize: 16, lineHeight: 1.7, marginBottom: 32 }}>
-            Join our Discord server, click <strong style={{ color: "#94a3b8" }}>Create Account</strong>, and you&apos;re up and running in under a minute.
-          </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <Link href="/login" style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 28px", borderRadius: 12, background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white", textDecoration: "none", fontWeight: 700, fontSize: 16, boxShadow: "0 6px 24px rgba(124,58,237,0.4)" }}>
-              <Mail size={17} /> Create Free Account
-            </Link>
-            <Link href="/docs" style={{ display: "flex", alignItems: "center", gap: 7, padding: "13px 22px", borderRadius: 12, background: "transparent", border: "1px solid #1e1e2e", color: "#94a3b8", textDecoration: "none", fontWeight: 600, fontSize: 15 }}>
-              <ExternalLink size={15} /> Read the Docs
-            </Link>
           </div>
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer style={{ borderTop: "1px solid #1e1e2e", padding: "32px 24px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Mail size={13} color="white" />
-            </div>
-            <span style={{ fontWeight: 700, color: "#64748b", fontSize: 14 }}>MailDrop</span>
+      <footer style={{ borderTop: "1px solid #1e1e2e", padding: "36px 24px", textAlign: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, marginBottom: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Link2 size={14} color="white" />
           </div>
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-            {[
-              { href: "/docs", label: "API Docs", icon: <Webhook size={13} /> },
-              { href: "/dashboard", label: "Dashboard", icon: <Inbox size={13} /> },
-              { href: "/login", label: "Login", icon: <Lock size={13} /> },
-            ].map((l) => (
-              <Link key={l.href} href={l.href} style={{ fontSize: 13, color: "#4b5563", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, transition: "color 0.15s" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "#4b5563")}
-              >
-                {l.icon} {l.label}
-              </Link>
-            ))}
-          </div>
-          <p style={{ fontSize: 12, color: "#2d2d3f" }}>© {new Date().getFullYear()} MailDrop · gootephode.me</p>
+          <span style={{ fontWeight: 800, fontSize: 15, color: "#f1f5f9" }}>LinkDrop</span>
+        </div>
+        <p style={{ fontSize: 13, color: "#4b5563" }}>Fast, private URL shortening with Discord bot integration &amp; admin panel.</p>
+        <div style={{ display: "flex", gap: 20, justifyContent: "center", marginTop: 16 }}>
+          {[
+            { href: "/docs", label: "API Docs" },
+            { href: "/login", label: "Login" },
+            { href: "/dashboard", label: "Dashboard" },
+          ].map((l) => (
+            <Link key={l.href} href={l.href} style={{ fontSize: 13, color: "#4b5563", textDecoration: "none", transition: "color 0.15s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#4b5563")}
+            >{l.label}</Link>
+          ))}
         </div>
       </footer>
+
     </div>
   );
 }

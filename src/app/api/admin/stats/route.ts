@@ -3,8 +3,8 @@ import { auth } from "@/lib/auth";
 import {
   findUsers,
   countUsers,
-  countInboxes,
-  countEmails,
+  countLinks,
+  totalClicks,
   totalBalance,
   findTransactions,
 } from "@/lib/db";
@@ -23,8 +23,8 @@ export async function GET() {
   }
 
   const userCount  = countUsers();
-  const inboxCount = countInboxes({ isActive: true });
-  const emailCount = countEmails();
+  const linkCount  = countLinks({ isActive: true });
+  const clickCount = totalClicks();
   const balance    = totalBalance();
 
   const recentUsers = findUsers()
@@ -43,7 +43,7 @@ export async function GET() {
     });
 
   return NextResponse.json({
-    stats: { userCount, inboxCount, emailCount, totalBalance: balance },
+    stats: { userCount, linkCount, clickCount, totalBalance: balance },
     recentUsers,
     recentTransactions,
   });

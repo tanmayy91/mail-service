@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
-    "start:all": "tsx bot/index.ts & BOT_PID=$!; tsx services/imap.ts & IMAP_PID=$!; next start -p ${PORT:-3000}; kill $BOT_PID $IMAP_PID 2>/dev/null || true",
-    "imap:start": "tsx services/imap.ts",
+    "start:all": "tsx bot/index.ts & BOT_PID=$!; next start -p ${PORT:-3000}; kill $BOT_PID 2>/dev/null || true",
     "lint": "eslint",
     "bot:build": "tsc -p bot/tsconfig.json",
     "bot:start": "tsx bot/index.ts"

@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Mail, Users, Inbox, BarChart2, LogOut, DollarSign,
+  Link2, Users, BarChart3, LogOut, DollarSign,
   Search, RefreshCw, Send,
   Shield, Activity, AlertCircle, Check, X,
-  CreditCard,
+  CreditCard, MousePointer2,
 } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { PlanBadge } from "@/components/ui/PlanBadge";
@@ -20,9 +20,9 @@ interface UserRow {
   email: string;
   username: string;
   balance: number;
-  plan: "free" | "starter" | "pro" | "enterprise";
-  inboxCount: number;
-  emailsReceived: number;
+  plan: "none" | "free" | "starter" | "pro" | "enterprise" | "custom";
+  linkCount: number;
+  totalClicks: number;
   isActive: boolean;
   createdAt: string;
   discordId?: string;
@@ -30,8 +30,8 @@ interface UserRow {
 
 interface Stats {
   userCount: number;
-  inboxCount: number;
-  emailCount: number;
+  linkCount: number;
+  clickCount: number;
   totalBalance: number;
 }
 
@@ -165,7 +165,7 @@ export default function AdminClient() {
   }
 
   const NAV_ITEMS = [
-    { id: "overview", icon: <BarChart2 size={16} />, label: "Overview" },
+    { id: "overview", icon: <BarChart3 size={16} />, label: "Overview" },
     { id: "users", icon: <Users size={16} />, label: "Users" },
     { id: "topup", icon: <DollarSign size={16} />, label: "Top-up" },
   ] as const;
@@ -178,10 +178,10 @@ export default function AdminClient() {
         <div style={{ padding: "20px 20px 14px", borderBottom: "1px solid #1e1e2e" }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg, #7c3aed, #10b981)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Mail size={18} color="white" />
+              <Link2 size={18} color="white" />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>MailDrop</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#f1f5f9" }}>LinkDrop</div>
               <div style={{ fontSize: 11, color: "#64748b" }}>Admin Panel</div>
             </div>
           </Link>
@@ -239,8 +239,8 @@ export default function AdminClient() {
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 32 }}>
               <StatCard label="Total Users" value={stats?.userCount ?? "—"} icon={<Users size={18} />} color="#7c3aed" trend={{ value: "12%", up: true }} />
-              <StatCard label="Active Inboxes" value={stats?.inboxCount ?? "—"} icon={<Inbox size={18} />} color="#10b981" trend={{ value: "8%", up: true }} />
-              <StatCard label="Emails Received" value={stats?.emailCount ?? "—"} icon={<Mail size={18} />} color="#5865f2" trend={{ value: "23%", up: true }} />
+              <StatCard label="Active Links"   value={stats?.linkCount  ?? "—"} icon={<Link2 size={18} />}         color="#10b981" trend={{ value: "8%",  up: true }} />
+              <StatCard label="Total Clicks"   value={stats?.clickCount ?? "—"} icon={<MousePointer2 size={18} />} color="#5865f2" trend={{ value: "23%", up: true }} />
               <StatCard label="Total Balance" value={`$${(stats?.totalBalance ?? 0).toFixed(2)}`} icon={<CreditCard size={18} />} color="#f59e0b" />
             </div>
 
@@ -328,7 +328,7 @@ export default function AdminClient() {
             <div style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 16, overflow: "hidden" }}>
               {/* Header */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px", gap: 0, padding: "12px 20px", borderBottom: "1px solid #1e1e2e", background: "#0d0d14" }}>
-                {["User", "Plan", "Balance", "Inboxes", "Status", "Actions"].map((h) => (
+                {["User", "Plan", "Balance", "Links", "Status", "Actions"].map((h) => (
                   <div key={h} style={{ fontSize: 11, fontWeight: 600, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
                 ))}
               </div>
@@ -370,8 +370,8 @@ export default function AdminClient() {
                     </div>
                     {/* Balance */}
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#34d399" }}>${u.balance.toFixed(2)}</div>
-                    {/* Inboxes */}
-                    <div style={{ fontSize: 14, color: "#94a3b8" }}>{u.inboxCount}</div>
+                    {/* Links */}
+                    <div style={{ fontSize: 14, color: "#94a3b8" }}>{u.linkCount}</div>
                     {/* Status */}
                     <div>
                       <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 100, background: u.isActive ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.1)", color: u.isActive ? "#34d399" : "#f87171", border: `1px solid ${u.isActive ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.2)"}` }}>
