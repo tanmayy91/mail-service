@@ -8,7 +8,7 @@ import {
   Mail, Inbox, LogOut, Settings, ChevronRight,
   Copy, Check, RefreshCw, Trash2, Eye, EyeOff,
   Plus, Clock, AlertCircle, ExternalLink, Key,
-  TrendingUp, BarChart2, CreditCard, Layers,
+  TrendingUp, BarChart2, CreditCard, Layers, Send,
 } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { PlanBadge } from "@/components/ui/PlanBadge";
@@ -33,12 +33,15 @@ interface EmailPreview {
   receivedAt: string;
   isRead: boolean;
   isStarred: boolean;
+  direction?: "received" | "sent";
+  to?: string;
 }
 
 interface EmailFull extends EmailPreview {
   text?: string;
   html?: string;
   to: string;
+  direction?: "received" | "sent";
 }
 
 interface UserProfile {
@@ -73,6 +76,11 @@ export default function DashboardClient() {
   const [copiedKey, setCopiedKey] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showNewInbox, setShowNewInbox] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -173,7 +181,30 @@ export default function DashboardClient() {
     setSelectedInbox(inbox);
     setActiveTab("inbox-detail");
     setSelectedEmail(null);
+    setComposeOpen(false);
     fetchEmails(inbox._id);
+  }
+
+  async function sendEmail() {
+    if (!selectedInbox || !composeTo || !composeSubject || !composeBody) return;
+    setSending(true);
+    const res = await fetch(`/api/mail/${selectedInbox._id}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: composeTo, subject: composeSubject, text: composeBody }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast.success("Email sent!");
+      setComposeOpen(false);
+      setComposeTo("");
+      setComposeSubject("");
+      setComposeBody("");
+      fetchEmails(selectedInbox._id);
+    } else {
+      toast.error(data.error ?? "Failed to send email");
+    }
+    setSending(false);
   }
 
   if (status === "loading") {
@@ -440,6 +471,12 @@ export default function DashboardClient() {
                   <button onClick={() => fetchEmails(selectedInbox._id)} style={{ flex: 1, padding: "6px 0", borderRadius: 8, border: "1px solid #1e1e2e", background: "transparent", color: "#94a3b8", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
                     <RefreshCw size={12} style={refreshing ? { animation: "spin 0.8s linear infinite" } : {}} /> Refresh
                   </button>
+                  <button
+                    onClick={() => { setComposeOpen(true); setSelectedEmail(null); }}
+                    style={{ flex: 1, padding: "6px 0", borderRadius: 8, border: "1px solid rgba(124,58,237,0.4)", background: "rgba(124,58,237,0.12)", color: "#a78bfa", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+                  >
+                    <Send size={12} /> Compose
+                  </button>
                 </div>
               </div>
               <div style={{ flex: 1, padding: 8 }}>
@@ -453,7 +490,7 @@ export default function DashboardClient() {
                   emails.map((email) => (
                     <div
                       key={email._id}
-                      onClick={() => fetchEmail(selectedInbox._id, email._id)}
+                      onClick={() => { setComposeOpen(false); fetchEmail(selectedInbox._id, email._id); }}
                       style={{
                         padding: "12px 14px", borderRadius: 10, cursor: "pointer", marginBottom: 4,
                         background: selectedEmail?._id === email._id ? "rgba(124,58,237,0.15)" : "transparent",
@@ -465,9 +502,12 @@ export default function DashboardClient() {
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                         <span style={{ fontSize: 12, fontWeight: email.isRead ? 400 : 600, color: email.isRead ? "#64748b" : "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
-                          {email.fromName || email.from}
+                          {email.direction === "sent" ? `To: ${email.to}` : (email.fromName || email.from)}
                         </span>
-                        {!email.isRead && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#7c3aed", flexShrink: 0 }} />}
+                        {email.direction === "sent"
+                          ? <span style={{ fontSize: 10, color: "#10b981", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 6, padding: "1px 6px", flexShrink: 0 }}>Sent</span>
+                          : !email.isRead && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#7c3aed", flexShrink: 0 }} />
+                        }
                       </div>
                       <div style={{ fontSize: 13, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {email.subject}
@@ -479,18 +519,98 @@ export default function DashboardClient() {
               </div>
             </div>
 
-            {/* Email viewer */}
+            {/* Email viewer / Compose panel */}
             <div style={{ flex: 1, overflowY: "auto", padding: 32 }}>
-              {!selectedEmail ? (
+              {composeOpen ? (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                    <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 8 }}>
+                      <Send size={18} color="#a78bfa" /> New Message
+                    </h2>
+                    <button onClick={() => setComposeOpen(false)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 13 }}>✕ Cancel</button>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 5 }}>From</label>
+                      <div style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 14px", color: "#64748b", fontSize: 14 }}>
+                        {selectedInbox.address}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 5 }}>To</label>
+                      <input
+                        value={composeTo}
+                        onChange={(e) => setComposeTo(e.target.value)}
+                        placeholder="recipient@example.com"
+                        style={{ width: "100%", boxSizing: "border-box", background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 14px", color: "#e2e8f0", fontSize: 14, outline: "none" }}
+                        onFocus={(e) => (e.target.style.borderColor = "#7c3aed")}
+                        onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 5 }}>Subject</label>
+                      <input
+                        value={composeSubject}
+                        onChange={(e) => setComposeSubject(e.target.value)}
+                        placeholder="Enter subject…"
+                        style={{ width: "100%", boxSizing: "border-box", background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 14px", color: "#e2e8f0", fontSize: 14, outline: "none" }}
+                        onFocus={(e) => (e.target.style.borderColor = "#7c3aed")}
+                        onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 5 }}>Message</label>
+                      <textarea
+                        value={composeBody}
+                        onChange={(e) => setComposeBody(e.target.value)}
+                        placeholder="Write your message…"
+                        rows={10}
+                        style={{ width: "100%", boxSizing: "border-box", background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 14px", color: "#e2e8f0", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+                        onFocus={(e) => (e.target.style.borderColor = "#7c3aed")}
+                        onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        onClick={sendEmail}
+                        disabled={sending || !composeTo || !composeSubject || !composeBody}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8,
+                          padding: "10px 22px", borderRadius: 10, border: "none", cursor: "pointer",
+                          background: (sending || !composeTo || !composeSubject || !composeBody) ? "#1e1e2e" : "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                          color: (sending || !composeTo || !composeSubject || !composeBody) ? "#4b5563" : "white",
+                          fontWeight: 600, fontSize: 14,
+                        }}
+                      >
+                        <Send size={15} /> {sending ? "Sending…" : "Send"}
+                      </button>
+                      <button onClick={() => setComposeOpen(false)} style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid #1e1e2e", background: "transparent", color: "#64748b", fontSize: 14, cursor: "pointer" }}>
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : !selectedEmail ? (
                 <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "#4b5563" }}>
                   <Mail size={40} color="#1e1e2e" />
                   <p style={{ fontSize: 14 }}>Select an email to read</p>
+                  <button
+                    onClick={() => setComposeOpen(true)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", borderRadius: 10, border: "1px solid rgba(124,58,237,0.4)", background: "rgba(124,58,237,0.1)", color: "#a78bfa", fontSize: 13, cursor: "pointer", marginTop: 4 }}
+                  >
+                    <Send size={14} /> Compose
+                  </button>
                 </div>
               ) : (
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
                     <div>
-                      <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 8 }}>{selectedEmail.subject}</h2>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f1f5f9" }}>{selectedEmail.subject}</h2>
+                        {selectedEmail.direction === "sent" && (
+                          <span style={{ fontSize: 11, color: "#10b981", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>Sent</span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 13, color: "#64748b" }}>
                         <strong style={{ color: "#94a3b8" }}>From:</strong> {selectedEmail.fromName ? `${selectedEmail.fromName} <${selectedEmail.from}>` : selectedEmail.from}
                       </div>

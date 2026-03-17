@@ -96,6 +96,7 @@ export interface EmailData {
   receivedAt: string;
   rawHeaders?: string;
   messageId?: string;
+  direction?: "received" | "sent";
   createdAt: string;
   updatedAt: string;
 }
