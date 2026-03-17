@@ -214,12 +214,12 @@ export default function LandingPage() {
               </button>
             </div>
             <pre style={{ margin: 0, padding: "20px 22px", fontSize: 14, lineHeight: 1.75, color: "#94a3b8", fontFamily: "var(--font-geist-mono)", overflowX: "auto", whiteSpace: "pre" }}>
-              <span style={{ color: "#64748b" }}>// Create an inbox &amp; read emails</span>{"\n"}
-              <span style={{ color: "#c084fc" }}>const</span> {"{"} inbox {"}"} <span style={{ color: "#64748b" }}>=</span> <span style={{ color: "#86efac" }}>await</span> maildrop.<span style={{ color: "#38bdf8" }}>createInbox</span>{"({ localPart: "}<span style={{ color: "#fcd34d" }}>"hello"</span>{" })"}{"\n"}
-              <span style={{ color: "#64748b" }}>// → hello@mail.gootephode.me</span>{"\n\n"}
+              <span style={{ color: "#64748b" }}>{"// Create an inbox & read emails"}</span>{"\n"}
+              <span style={{ color: "#c084fc" }}>const</span> {"{"} inbox {"}"} <span style={{ color: "#64748b" }}>=</span> <span style={{ color: "#86efac" }}>await</span> maildrop.<span style={{ color: "#38bdf8" }}>createInbox</span>{"({ localPart: "}<span style={{ color: "#fcd34d" }}>{'"hello"'}</span>{" })"}{"\n"}
+              <span style={{ color: "#64748b" }}>{"// → hello@novacloud.tech"}</span>{"\n\n"}
               <span style={{ color: "#c084fc" }}>const</span> {"{"} emails {"}"} <span style={{ color: "#64748b" }}>=</span> <span style={{ color: "#86efac" }}>await</span> maildrop.<span style={{ color: "#38bdf8" }}>listEmails</span>{"(inbox._id)"}{"\n"}
               console.<span style={{ color: "#38bdf8" }}>log</span>{"(emails[0].subject)"}{"\n"}
-              <span style={{ color: "#64748b" }}>// "Welcome to the service!"</span>
+              <span style={{ color: "#64748b" }}>{'// "Welcome to the service!"'}</span>
             </pre>
           </div>
         </div>
