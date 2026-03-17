@@ -2,13 +2,13 @@ import { v4 as uuidv4 } from "uuid";
 
 export function generateApiKey(): string {
   const key = uuidv4().replace(/-/g, "");
-  return `ms_${key}`;
+  return `ld_${key}`;
 }
 
-export function generateLocalPart(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+export function generateSlug(length = 7): string {
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let result = "";
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
@@ -44,29 +44,25 @@ export function cn(...classes: (string | undefined | null | boolean)[]): string 
 export const PLANS = {
   free: {
     name: "Free",
-    inboxLimit: 3,
-    emailLimit: 100,
+    linkLimit: 10,
     price: 0,
     color: "#94a3b8",
   },
   starter: {
     name: "Starter",
-    inboxLimit: 10,
-    emailLimit: 1000,
+    linkLimit: 100,
     price: 5,
     color: "#7c3aed",
   },
   pro: {
     name: "Pro",
-    inboxLimit: 50,
-    emailLimit: 10000,
+    linkLimit: 500,
     price: 15,
     color: "#10b981",
   },
   enterprise: {
     name: "Enterprise",
-    inboxLimit: -1,
-    emailLimit: -1,
+    linkLimit: -1,
     price: 50,
     color: "#f59e0b",
   },

@@ -1,13 +1,14 @@
 /**
- * Inbox model — re-exports from the shared JSON database (src/lib/db.ts).
+ * Link model — re-exports from the shared JSON database (src/lib/db.ts).
  */
-export type { InboxData as IInbox } from "@/lib/db";
+export type { LinkData as ILink } from "@/lib/db";
 export {
-  findInbox,
-  findInboxById,
-  findInboxes,
-  createInbox,
-  updateInbox,
-  countInboxes,
-  deleteEmailsByInbox,
+  findLink,
+  findLinkById,
+  findLinks,
+  createLink,
+  updateLink,
+  deleteLink,
+  countLinks,
+  totalClicks,
 } from "@/lib/db";

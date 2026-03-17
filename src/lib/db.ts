@@ -38,8 +38,8 @@ export interface UserData {
   balance: number;
   apiKey: string;
   plan: "none" | "free" | "starter" | "pro" | "enterprise" | "custom";
-  inboxCount: number;
-  emailsReceived: number;
+  linkCount: number;
+  totalClicks: number;
   isActive: boolean;
   lastLogin: string;
   createdAt: string;
@@ -60,42 +60,15 @@ export interface TransactionData {
   updatedAt: string;
 }
 
-export interface InboxData {
+export interface LinkData {
   _id: string;
   userId: string;
-  address: string;
-  domain: string;
-  localPart: string;
+  slug: string;
+  url: string;
+  title?: string;
+  clicks: number;
   isActive: boolean;
-  emailCount: number;
   expiresAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AttachmentData {
-  filename: string;
-  contentType: string;
-  size: number;
-  content?: string;
-}
-
-export interface EmailData {
-  _id: string;
-  inboxId: string;
-  userId: string;
-  from: string;
-  fromName?: string;
-  to: string;
-  subject: string;
-  text?: string;
-  html?: string;
-  attachments: AttachmentData[];
-  isRead: boolean;
-  isStarred: boolean;
-  receivedAt: string;
-  rawHeaders?: string;
-  messageId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -112,8 +85,7 @@ export interface BotConfigData {
 export interface DB {
   users: UserData[];
   transactions: TransactionData[];
-  inboxes: InboxData[];
-  emails: EmailData[];
+  links: LinkData[];
   botConfigs: BotConfigData[];
 }
 
@@ -133,12 +105,11 @@ export function readDB(): DB {
     return {
       users:        data.users        ?? [],
       transactions: data.transactions ?? [],
-      inboxes:      data.inboxes      ?? [],
-      emails:       data.emails       ?? [],
+      links:        data.links        ?? [],
       botConfigs:   data.botConfigs   ?? [],
     };
   } catch {
-    return { users: [], transactions: [], inboxes: [], emails: [], botConfigs: [] };
+    return { users: [], transactions: [], links: [], botConfigs: [] };
   }
 }
 
@@ -245,105 +216,63 @@ export function countTransactions(userId: string): number {
   return findTransactions({ userId }).length;
 }
 
-// ─── Inboxes ──────────────────────────────────────────────────────────────────
+// ─── Links ────────────────────────────────────────────────────────────────────
 
-export function findInbox(query: Partial<InboxData>): InboxData | undefined {
+export function findLink(query: Partial<LinkData>): LinkData | undefined {
   const db = readDB();
-  const entries = Object.entries(query) as [keyof InboxData, unknown][];
-  return db.inboxes.find(i => entries.every(([k, v]) => i[k] === v));
+  const entries = Object.entries(query) as [keyof LinkData, unknown][];
+  return db.links.find(l => entries.every(([k, v]) => l[k] === v));
 }
 
-export function findInboxById(id: string): InboxData | undefined {
-  return readDB().inboxes.find(i => i._id === id);
+export function findLinkById(id: string): LinkData | undefined {
+  return readDB().links.find(l => l._id === id);
 }
 
-export function findInboxes(query: Partial<InboxData> = {}): InboxData[] {
+export function findLinks(query: Partial<LinkData> = {}): LinkData[] {
   const db = readDB();
-  const entries = Object.entries(query) as [keyof InboxData, unknown][];
-  if (entries.length === 0) return db.inboxes;
-  return db.inboxes.filter(i => entries.every(([k, v]) => i[k] === v));
+  const entries = Object.entries(query) as [keyof LinkData, unknown][];
+  if (entries.length === 0) return db.links;
+  return db.links.filter(l => entries.every(([k, v]) => l[k] === v));
 }
 
-export function createInbox(
-  data: Omit<InboxData, "_id" | "createdAt" | "updatedAt">
-): InboxData {
-  const db = readDB();
-  const now = new Date().toISOString();
-  const inbox: InboxData = { ...data, _id: newId(), createdAt: now, updatedAt: now };
-  db.inboxes.push(inbox);
-  writeDB(db);
-  return inbox;
-}
-
-export function updateInbox(
-  id: string,
-  update: Partial<InboxData>
-): InboxData | undefined {
-  const db = readDB();
-  const idx = db.inboxes.findIndex(i => i._id === id);
-  if (idx < 0) return undefined;
-  db.inboxes[idx] = { ...db.inboxes[idx], ...update, updatedAt: new Date().toISOString() };
-  writeDB(db);
-  return db.inboxes[idx];
-}
-
-export function countInboxes(query: Partial<InboxData> = {}): number {
-  return findInboxes(query).length;
-}
-
-export function deleteEmailsByInbox(inboxId: string): void {
-  const db = readDB();
-  db.emails = db.emails.filter(e => e.inboxId !== inboxId);
-  writeDB(db);
-}
-
-// ─── Emails ───────────────────────────────────────────────────────────────────
-
-export function findEmailById(id: string): EmailData | undefined {
-  return readDB().emails.find(e => e._id === id);
-}
-
-export function findEmails(query: Partial<EmailData> = {}): EmailData[] {
-  const db = readDB();
-  const entries = Object.entries(query) as [keyof EmailData, unknown][];
-  if (entries.length === 0) return db.emails;
-  return db.emails.filter(e => entries.every(([k, v]) => e[k] === v));
-}
-
-export function createEmail(
-  data: Omit<EmailData, "_id" | "createdAt" | "updatedAt">
-): EmailData {
+export function createLink(
+  data: Omit<LinkData, "_id" | "createdAt" | "updatedAt">
+): LinkData {
   const db = readDB();
   const now = new Date().toISOString();
-  const email: EmailData = { ...data, _id: newId(), createdAt: now, updatedAt: now };
-  db.emails.push(email);
+  const link: LinkData = { ...data, _id: newId(), createdAt: now, updatedAt: now };
+  db.links.push(link);
   writeDB(db);
-  return email;
+  return link;
 }
 
-export function updateEmail(
+export function updateLink(
   id: string,
-  update: Partial<EmailData>
-): EmailData | undefined {
+  update: Partial<LinkData>
+): LinkData | undefined {
   const db = readDB();
-  const idx = db.emails.findIndex(e => e._id === id);
+  const idx = db.links.findIndex(l => l._id === id);
   if (idx < 0) return undefined;
-  db.emails[idx] = { ...db.emails[idx], ...update, updatedAt: new Date().toISOString() };
+  db.links[idx] = { ...db.links[idx], ...update, updatedAt: new Date().toISOString() };
   writeDB(db);
-  return db.emails[idx];
+  return db.links[idx];
 }
 
-export function deleteEmail(id: string): EmailData | undefined {
+export function deleteLink(id: string): LinkData | undefined {
   const db = readDB();
-  const idx = db.emails.findIndex(e => e._id === id);
+  const idx = db.links.findIndex(l => l._id === id);
   if (idx < 0) return undefined;
-  const [deleted] = db.emails.splice(idx, 1);
+  const [deleted] = db.links.splice(idx, 1);
   writeDB(db);
   return deleted;
 }
 
-export function countEmails(query: Partial<EmailData> = {}): number {
-  return findEmails(query).length;
+export function countLinks(query: Partial<LinkData> = {}): number {
+  return findLinks(query).length;
+}
+
+export function totalClicks(query: Partial<LinkData> = {}): number {
+  return findLinks(query).reduce((sum, l) => sum + l.clicks, 0);
 }
 
 // ─── BotConfig ────────────────────────────────────────────────────────────────

@@ -1,12 +1,15 @@
 /**
- * Email model — re-exports from the shared JSON database (src/lib/db.ts).
+ * Link model — re-exports from the shared JSON database (src/lib/db.ts).
+ * This file replaces the former Email model.
  */
-export type { EmailData as IEmail, AttachmentData as IAttachment } from "@/lib/db";
+export type { LinkData as ILink } from "@/lib/db";
 export {
-  findEmailById,
-  findEmails,
-  createEmail,
-  updateEmail,
-  deleteEmail,
-  countEmails,
+  findLink,
+  findLinkById,
+  findLinks,
+  createLink,
+  updateLink,
+  deleteLink,
+  countLinks,
+  totalClicks,
 } from "@/lib/db";

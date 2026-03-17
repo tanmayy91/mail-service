@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { findUser, updateUser, findInboxes, findTransactions } from "@/lib/db";
+import { findUser, updateUser, findLinks, findTransactions } from "@/lib/db";
 
 export async function GET(
   req: NextRequest,
@@ -17,7 +17,7 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const inboxes = findInboxes({ userId, isActive: true });
+  const links = findLinks({ userId, isActive: true });
   const transactions = findTransactions({ userId })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 20);
@@ -25,7 +25,7 @@ export async function GET(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password, ...safeUser } = user;
 
-  return NextResponse.json({ user: safeUser, inboxes, transactions });
+  return NextResponse.json({ user: safeUser, links, transactions });
 }
 
 export async function PATCH(

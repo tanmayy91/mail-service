@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import {
   findUser,
   updateUser,
-  countInboxes,
+  countLinks,
   findTransactions,
 } from "@/lib/db";
 import { generateApiKey } from "@/lib/utils";
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const inboxCount = countInboxes({ userId: dbUser._id, isActive: true });
+  const linkCount = countLinks({ userId: dbUser._id, isActive: true });
   const recentTransactions = findTransactions({ userId: dbUser._id })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
   const { password, ...safeUser } = dbUser;
 
   return NextResponse.json({
-    user: { ...safeUser, inboxCount, recentTransactions },
+    user: { ...safeUser, linkCount, recentTransactions },
   });
 }
 
