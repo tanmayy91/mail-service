@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import {
   findUsers,
@@ -9,15 +9,15 @@ import {
   findTransactions,
 } from "@/lib/db";
 
-async function requireAdmin(req: NextRequest) {
+async function requireAdmin() {
   const session = await auth();
   if (!session?.user?.isAdmin) return null;
   return session;
 }
 
 // GET /api/admin/stats
-export async function GET(req: NextRequest) {
-  const session = await requireAdmin(req);
+export async function GET() {
+  const session = await requireAdmin();
   if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

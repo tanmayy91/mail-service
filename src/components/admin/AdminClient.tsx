@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Mail, Users, Inbox, BarChart2, LogOut, DollarSign,
-  Search, ChevronRight, TrendingUp, RefreshCw, Send,
-  Shield, Layers, Activity, AlertCircle, Check, X,
-  CreditCard, Clock, Filter,
+  Search, RefreshCw, Send,
+  Shield, Activity, AlertCircle, Check, X,
+  CreditCard,
 } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { PlanBadge } from "@/components/ui/PlanBadge";
@@ -65,14 +65,6 @@ export default function AdminClient() {
   const [topupLoading, setTopupLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
-  useEffect(() => {
-    if (status === "unauthenticated") router.push("/login");
-    if (status === "authenticated") {
-      if (!session?.user?.isAdmin) router.push("/dashboard");
-      else { fetchStats(); fetchUsers(); }
-    }
-  }, [status]);
-
   async function fetchStats() {
     const res = await fetch("/api/admin/stats");
     if (res.ok) {
@@ -94,6 +86,15 @@ export default function AdminClient() {
     }
     setLoadingUsers(false);
   }
+
+  useEffect(() => {
+    if (status === "unauthenticated") router.push("/login");
+    if (status === "authenticated") {
+      if (!session?.user?.isAdmin) router.push("/dashboard");
+      else { fetchStats(); fetchUsers(); }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   async function handleTopup() {
     const amount = parseFloat(topupAmount);

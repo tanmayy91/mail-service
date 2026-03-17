@@ -4,7 +4,6 @@ import {
   findUser,
   findInboxById,
   findEmails,
-  countEmails,
   updateInbox,
   updateUser,
   deleteEmailsByInbox,
