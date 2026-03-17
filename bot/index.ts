@@ -29,8 +29,30 @@ dotenv.config(); // also load .env (Railway / production)
 const MONGODB_URI = process.env.MONGODB_URI!;
 const WEBSITE_URL = process.env.WEBSITE_URL || "https://gootephode.me";
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN!;
-const PREFIX = process.env.DISCORD_BOT_PREFIX || "!";
+const PREFIX = process.env.DISCORD_BOT_PREFIX || ".";
 const OWNER_IDS = (process.env.DISCORD_OWNER_IDS || "").split(",").filter(Boolean);
+
+// ─────────────────────────────────────────────
+//  Plan definitions (single source of truth)
+// ─────────────────────────────────────────────
+interface PlanInfo {
+  key: string;
+  label: string;
+  emoji: string;
+  price: number | null;          // null = contact staff
+  inboxes: number | null;        // null = unlimited
+  emailsPerMonth: number | null; // null = unlimited
+}
+
+const PLANS: PlanInfo[] = [
+  { key: "starter",    label: "Starter",    emoji: "⚡", price: 5,  inboxes: 10, emailsPerMonth: 1_000  },
+  { key: "pro",        label: "Pro",        emoji: "🚀", price: 15, inboxes: 50, emailsPerMonth: 10_000 },
+  { key: "enterprise", label: "Enterprise", emoji: "🏢", price: 50, inboxes: null, emailsPerMonth: null },
+  { key: "custom",     label: "Custom",     emoji: "🎨", price: null, inboxes: null, emailsPerMonth: null },
+];
+
+// "none" is the initial state — user must purchase a plan
+const VALID_PLANS = ["none", ...PLANS.map(p => p.key)];
 
 if (!BOT_TOKEN) {
   console.error("❌  DISCORD_BOT_TOKEN is not set");
@@ -48,7 +70,7 @@ const userSchema = new mongoose.Schema(
     isAdmin: { type: Boolean, default: false },
     balance: { type: Number, default: 0 },
     apiKey: { type: String, unique: true, required: true },
-    plan: { type: String, enum: ["free", "starter", "pro", "enterprise"], default: "free" },
+    plan: { type: String, enum: ["none", "starter", "pro", "enterprise", "custom"], default: "none" },
     inboxCount: { type: Number, default: 0 },
     emailsReceived: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
@@ -156,18 +178,21 @@ function buildPanel1Row(): ActionRowBuilder<ButtonBuilder> {
 }
 
 function buildPanel2Embed(): EmbedBuilder {
+  const planLines = PLANS.map(p =>
+    p.price !== null
+      ? `${p.emoji}  **${p.label}** ($${p.price}/mo) — ${p.inboxes !== null ? `${p.inboxes} inboxes · ${p.emailsPerMonth!.toLocaleString()} emails/mo` : "Unlimited"}`
+      : `${p.emoji}  **${p.label}** — Contact staff for a tailored plan`
+  ).join("\n");
+
   return new EmbedBuilder()
     .setColor(0x10b981)
-    .setTitle("💰  Credits & Top-up")
+    .setTitle("💰  Credits")
     .setDescription(
-      "Top up credits to unlock higher plans and more inboxes.\n\n" +
+      "Add credits to unlock higher plans and more inboxes.\n\n" +
         "**Plans:**\n" +
-        "🆓  **Free** — 3 inboxes · 100 emails/mo\n" +
-        "⚡  **Starter** ($5) — 10 inboxes · 1 000 emails/mo\n" +
-        "🚀  **Pro** ($15) — 50 inboxes · 10 000 emails/mo\n" +
-        "🏢  **Enterprise** ($50) — Unlimited\n\n" +
-        "Contact a staff member or wait for the owner to top up your balance.\n" +
-        "Use `!balance` to check your current balance."
+        planLines + "\n\n" +
+        "New accounts start with **no plan** — purchase one to unlock inboxes.\n" +
+        `Use \`${PREFIX}balance\` to check your current balance.`
     )
     .setFooter({ text: "MailDrop · " + WEBSITE_URL })
     .setTimestamp();
@@ -264,7 +289,7 @@ client.on("messageCreate", async (message: Message) => {
       config.panel2ChannelId = message.channel.id;
       config.panel2MessageId = sent.id;
       await config.save();
-      await message.reply("✅ Panel 2 (Credits & Top-up) deployed!");
+      await message.reply("✅ Panel 2 (Credits) deployed!");
     }
     return;
   }
@@ -283,43 +308,43 @@ client.on("messageCreate", async (message: Message) => {
     return void message.reply(`✅ Ticket category set to \`${catId}\`.`);
   }
 
-  // ── !topup ────────────────────────────────
-  if (command === "topup") {
+  // ── .credit ───────────────────────────────
+  if (command === "credit") {
     if (!isOwner) return message.reply("❌ Owner only.");
     const mention = message.mentions.users.first();
     const amount = parseFloat(args[1] ?? "");
     if (!mention || isNaN(amount) || amount <= 0) {
-      return void message.reply("Usage: `!topup @user <amount>`");
+      return void message.reply("Usage: `.credit @user <amount>`");
     }
     await connectDB();
     const user = await UserModel.findOne({ discordId: mention.id });
-    if (!user) return void message.reply("❌ That user doesn't have a MailDrop account (no linked Discord ID). Use `!topupbyemail <email> <amount>` instead.");
+    if (!user) return void message.reply("❌ That user doesn't have a MailDrop account (no linked Discord ID). Use `.creditbyemail <email> <amount>` instead.");
     const before = user.balance;
     user.balance = before + amount;
     await user.save();
-    await TransactionModel.create({ userId: user._id, type: "topup", amount, balanceBefore: before, balanceAfter: user.balance, description: `Admin top-up: $${amount}`, performedBy: message.author.tag });
+    await TransactionModel.create({ userId: user._id, type: "topup", amount, balanceBefore: before, balanceAfter: user.balance, description: `Admin credit: $${amount}`, performedBy: message.author.tag });
 
     // DM the user
     try {
       const dmEmbed = new EmbedBuilder()
         .setColor(0x10b981)
-        .setTitle("💰 Balance Top-up")
-        .setDescription(`Your MailDrop balance has been topped up by **$${amount}**!\n\nNew balance: **$${user.balance.toFixed(2)}**\n\n[Visit Dashboard](${WEBSITE_URL}/dashboard)`)
+        .setTitle("💰 Balance Credited")
+        .setDescription(`Your MailDrop balance has been credited **$${amount}**!\n\nNew balance: **$${user.balance.toFixed(2)}**\n\n[Visit Dashboard](${WEBSITE_URL}/dashboard)`)
         .setFooter({ text: "MailDrop · " + WEBSITE_URL })
         .setTimestamp();
       await mention.send({ embeds: [dmEmbed] });
     } catch { /* DMs disabled */ }
 
-    return void message.reply(`✅ Topped up **$${amount}** to ${mention.tag}. New balance: **$${user.balance.toFixed(2)}**`);
+    return void message.reply(`✅ Credited **$${amount}** to ${mention.tag}. New balance: **$${user.balance.toFixed(2)}**`);
   }
 
-  // ── !topupbyemail ─────────────────────────
-  if (command === "topupbyemail") {
+  // ── .creditbyemail ────────────────────────
+  if (command === "creditbyemail") {
     if (!isOwner) return message.reply("❌ Owner only.");
     const email = args[0];
     const amount = parseFloat(args[1] ?? "");
     if (!email || isNaN(amount) || amount <= 0) {
-      return void message.reply("Usage: `!topupbyemail <email> <amount>`");
+      return void message.reply("Usage: `.creditbyemail <email> <amount>`");
     }
     await connectDB();
     const user = await UserModel.findOne({ email: email.toLowerCase() });
@@ -327,11 +352,96 @@ client.on("messageCreate", async (message: Message) => {
     const before = user.balance;
     user.balance = before + amount;
     await user.save();
-    await TransactionModel.create({ userId: user._id, type: "topup", amount, balanceBefore: before, balanceAfter: user.balance, description: `Admin top-up: $${amount}`, performedBy: message.author.tag });
-    return void message.reply(`✅ Topped up **$${amount}** to \`${email}\`. New balance: **$${user.balance.toFixed(2)}**`);
+    await TransactionModel.create({ userId: user._id, type: "topup", amount, balanceBefore: before, balanceAfter: user.balance, description: `Admin credit: $${amount}`, performedBy: message.author.tag });
+    return void message.reply(`✅ Credited **$${amount}** to \`${email}\`. New balance: **$${user.balance.toFixed(2)}**`);
   }
 
-  // ── !balance ──────────────────────────────
+  // ── .deduct ───────────────────────────────
+  if (command === "deduct") {
+    if (!isOwner) return message.reply("❌ Owner only.");
+    const mention = message.mentions.users.first();
+    const amount = parseFloat(args[1] ?? "");
+    if (!mention || isNaN(amount) || amount <= 0) {
+      return void message.reply("Usage: `.deduct @user <amount>`");
+    }
+    await connectDB();
+    const user = await UserModel.findOne({ discordId: mention.id });
+    if (!user) return void message.reply("❌ That user doesn't have a MailDrop account linked.");
+    const before = user.balance;
+    user.balance = Math.max(0, before - amount);
+    const deducted = before - user.balance;
+    await user.save();
+    await TransactionModel.create({ userId: user._id, type: "deduct", amount: deducted, balanceBefore: before, balanceAfter: user.balance, description: `Admin deduct: $${deducted}`, performedBy: message.author.tag });
+
+    try {
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0xef4444)
+        .setTitle("💸 Balance Deducted")
+        .setDescription(`**$${deducted.toFixed(2)}** has been deducted from your MailDrop balance.\n\nNew balance: **$${user.balance.toFixed(2)}**\n\n[Visit Dashboard](${WEBSITE_URL}/dashboard)`)
+        .setFooter({ text: "MailDrop · " + WEBSITE_URL })
+        .setTimestamp();
+      await mention.send({ embeds: [dmEmbed] });
+    } catch { /* DMs disabled */ }
+
+    return void message.reply(`✅ Deducted **$${deducted.toFixed(2)}** from ${mention.tag}. New balance: **$${user.balance.toFixed(2)}**`);
+  }
+
+  // ── .deductbyemail ────────────────────────
+  if (command === "deductbyemail") {
+    if (!isOwner) return message.reply("❌ Owner only.");
+    const email = args[0];
+    const amount = parseFloat(args[1] ?? "");
+    if (!email || isNaN(amount) || amount <= 0) {
+      return void message.reply("Usage: `.deductbyemail <email> <amount>`");
+    }
+    await connectDB();
+    const user = await UserModel.findOne({ email: email.toLowerCase() });
+    if (!user) return void message.reply("❌ No account found with that email.");
+    const before = user.balance;
+    user.balance = Math.max(0, before - amount);
+    const deducted = before - user.balance;
+    await user.save();
+    await TransactionModel.create({ userId: user._id, type: "deduct", amount: deducted, balanceBefore: before, balanceAfter: user.balance, description: `Admin deduct: $${deducted}`, performedBy: message.author.tag });
+    return void message.reply(`✅ Deducted **$${deducted.toFixed(2)}** from \`${email}\`. New balance: **$${user.balance.toFixed(2)}**`);
+  }
+
+  // ── .lookup ───────────────────────────────
+  if (command === "lookup") {
+    if (!isOwner) return message.reply("❌ Owner only.");
+    await connectDB();
+    let user;
+    const mention = message.mentions.users.first();
+    if (mention) {
+      user = await UserModel.findOne({ discordId: mention.id });
+    } else if (args[0]) {
+      user = await UserModel.findOne({ email: args[0].toLowerCase() });
+    } else {
+      return void message.reply("Usage: `.lookup @user` or `.lookup <email>`");
+    }
+    if (!user) return void message.reply("❌ No MailDrop account found.");
+    const txCount = await TransactionModel.countDocuments({ userId: user._id });
+    const embed = new EmbedBuilder()
+      .setColor(0x7c3aed)
+      .setTitle("🔍 Account Lookup")
+      .addFields(
+        { name: "👤 Username", value: user.username, inline: true },
+        { name: "📧 Email", value: user.email, inline: true },
+        { name: "💰 Balance", value: `$${user.balance.toFixed(2)}`, inline: true },
+        { name: "📋 Plan", value: user.plan, inline: true },
+        { name: "📬 Inboxes", value: user.inboxCount.toString(), inline: true },
+        { name: "📩 Emails Received", value: user.emailsReceived.toString(), inline: true },
+        { name: "🔑 API Key", value: `\`${user.apiKey}\``, inline: false },
+        { name: "🏦 Transactions", value: txCount.toString(), inline: true },
+        { name: "✅ Active", value: user.isActive ? "Yes" : "No", inline: true },
+        { name: "🛡️ Admin", value: user.isAdmin ? "Yes" : "No", inline: true },
+        { name: "📅 Joined", value: new Date(user.createdAt).toUTCString(), inline: false },
+      )
+      .setFooter({ text: "MailDrop · " + WEBSITE_URL })
+      .setTimestamp();
+    return void message.reply({ embeds: [embed] });
+  }
+
+  // ── .balance ──────────────────────────────
   if (command === "balance") {
     await connectDB();
     const target = message.mentions.users.first() ?? message.author;
@@ -364,14 +474,13 @@ client.on("messageCreate", async (message: Message) => {
     return void message.reply({ embeds: [embed] });
   }
 
-  // ── !setplan ──────────────────────────────
+  // ── .setplan ──────────────────────────────
   if (command === "setplan") {
     if (!isOwner) return message.reply("❌ Owner only.");
     const mention = message.mentions.users.first();
     const plan = args[1]?.toLowerCase();
-    const validPlans = ["free", "starter", "pro", "enterprise"];
-    if (!mention || !validPlans.includes(plan ?? "")) {
-      return void message.reply(`Usage: \`!setplan @user <${validPlans.join("|")}>\``);
+    if (!mention || !VALID_PLANS.includes(plan ?? "")) {
+      return void message.reply(`Usage: \`${PREFIX}setplan @user <${VALID_PLANS.join("|")}>\``);
     }
     await connectDB();
     const user = await UserModel.findOneAndUpdate({ discordId: mention.id }, { plan }, { new: true });
@@ -379,24 +488,27 @@ client.on("messageCreate", async (message: Message) => {
     return void message.reply(`✅ Set ${mention.tag}'s plan to **${plan}**.`);
   }
 
-  // ── !help ─────────────────────────────────
+  // ── .help ─────────────────────────────────
   if (command === "help") {
     const embed = new EmbedBuilder()
       .setColor(0x7c3aed)
       .setTitle("🤖 MailDrop Bot Commands")
       .setDescription(`Prefix: \`${PREFIX}\``)
       .addFields(
-        { name: "User Commands", value: "`!balance [@user]` — Check balance\n`!help` — Show this message" },
+        { name: "User Commands", value: `\`${PREFIX}balance [@user]\` — Check balance\n\`${PREFIX}help\` — Show this message` },
         {
           name: "Owner Commands",
           value:
-            `\`!setup panel1\` — Deploy registration panel\n` +
-            `\`!setup panel2\` — Deploy top-up panel\n` +
-            `\`!setcategory <id>\` — Set ticket category\n` +
-            `\`!topup @user <amount>\` — Top up balance\n` +
-            `\`!topupbyemail <email> <amount>\` — Top up by email\n` +
-            `\`!setplan @user <plan>\` — Change user plan\n` +
-            `\`!stats\` — View statistics`,
+            `\`${PREFIX}setup panel1\` — Deploy registration panel\n` +
+            `\`${PREFIX}setup panel2\` — Deploy credits panel\n` +
+            `\`${PREFIX}setcategory <id>\` — Set ticket category\n` +
+            `\`${PREFIX}credit @user <amount>\` — Add credits by Discord user\n` +
+            `\`${PREFIX}creditbyemail <email> <amount>\` — Add credits by email\n` +
+            `\`${PREFIX}deduct @user <amount>\` — Remove credits by Discord user\n` +
+            `\`${PREFIX}deductbyemail <email> <amount>\` — Remove credits by email\n` +
+            `\`${PREFIX}lookup @user|<email>\` — Look up account details\n` +
+            `\`${PREFIX}setplan @user <plan>\` — Change user plan\n` +
+            `\`${PREFIX}stats\` — View statistics`,
         }
       )
       .setFooter({ text: "MailDrop · " + WEBSITE_URL });
@@ -547,7 +659,7 @@ client.on("interactionCreate", async (interaction) => {
           avatar: btn.user.displayAvatarURL(),
           apiKey,
           balance: 0,
-          plan: "free",
+          plan: "none",
         });
 
         // ── Send DM ─────────────────────────
@@ -562,7 +674,7 @@ client.on("interactionCreate", async (interaction) => {
             `💰 **Credits:** $${newUser.balance.toFixed(2)}\n` +
             `📋 **Plan:** ${newUser.plan}\n\n` +
             `> 🔒 Keep your credentials safe. Never share them.\n` +
-            `> Use the top-up panel in our server to add credits.`
+            `> ⚠️ Your plan is currently **none** — use \`${PREFIX}calc\` to see what you can buy, then ask staff to assign a plan.`
           )
           .setThumbnail(btn.user.displayAvatarURL())
           .setFooter({ text: "MailDrop · " + WEBSITE_URL })
