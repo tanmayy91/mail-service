@@ -32,6 +32,28 @@ const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN!;
 const PREFIX = process.env.DISCORD_BOT_PREFIX || ".";
 const OWNER_IDS = (process.env.DISCORD_OWNER_IDS || "").split(",").filter(Boolean);
 
+// ─────────────────────────────────────────────
+//  Plan definitions (single source of truth)
+// ─────────────────────────────────────────────
+interface PlanInfo {
+  key: string;
+  label: string;
+  emoji: string;
+  price: number | null;          // null = contact staff
+  inboxes: number | null;        // null = unlimited
+  emailsPerMonth: number | null; // null = unlimited
+}
+
+const PLANS: PlanInfo[] = [
+  { key: "starter",    label: "Starter",    emoji: "⚡", price: 5,  inboxes: 10, emailsPerMonth: 1_000  },
+  { key: "pro",        label: "Pro",        emoji: "🚀", price: 15, inboxes: 50, emailsPerMonth: 10_000 },
+  { key: "enterprise", label: "Enterprise", emoji: "🏢", price: 50, inboxes: null, emailsPerMonth: null },
+  { key: "custom",     label: "Custom",     emoji: "🎨", price: null, inboxes: null, emailsPerMonth: null },
+];
+
+// "none" is the initial state — user must purchase a plan
+const VALID_PLANS = ["none", ...PLANS.map(p => p.key)];
+
 if (!BOT_TOKEN) {
   console.error("❌  DISCORD_BOT_TOKEN is not set");
   process.exit(1);
@@ -48,7 +70,7 @@ const userSchema = new mongoose.Schema(
     isAdmin: { type: Boolean, default: false },
     balance: { type: Number, default: 0 },
     apiKey: { type: String, unique: true, required: true },
-    plan: { type: String, enum: ["free", "starter", "pro", "enterprise"], default: "free" },
+    plan: { type: String, enum: ["none", "starter", "pro", "enterprise", "custom"], default: "none" },
     inboxCount: { type: Number, default: 0 },
     emailsReceived: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
@@ -156,17 +178,20 @@ function buildPanel1Row(): ActionRowBuilder<ButtonBuilder> {
 }
 
 function buildPanel2Embed(): EmbedBuilder {
+  const planLines = PLANS.map(p =>
+    p.price !== null
+      ? `${p.emoji}  **${p.label}** ($${p.price}/mo) — ${p.inboxes !== null ? `${p.inboxes} inboxes · ${p.emailsPerMonth!.toLocaleString()} emails/mo` : "Unlimited"}`
+      : `${p.emoji}  **${p.label}** — Contact staff for a tailored plan`
+  ).join("\n");
+
   return new EmbedBuilder()
     .setColor(0x10b981)
     .setTitle("💰  Credits")
     .setDescription(
       "Add credits to unlock higher plans and more inboxes.\n\n" +
         "**Plans:**\n" +
-        "🆓  **Free** — 3 inboxes · 100 emails/mo\n" +
-        "⚡  **Starter** ($5) — 10 inboxes · 1 000 emails/mo\n" +
-        "🚀  **Pro** ($15) — 50 inboxes · 10 000 emails/mo\n" +
-        "🏢  **Enterprise** ($50) — Unlimited\n\n" +
-        "Contact a staff member or ask the owner to credit your balance.\n" +
+        planLines + "\n\n" +
+        "New accounts start with **no plan** — purchase one to unlock inboxes.\n" +
         `Use \`${PREFIX}balance\` to check your current balance.`
     )
     .setFooter({ text: "MailDrop · " + WEBSITE_URL })
@@ -449,14 +474,13 @@ client.on("messageCreate", async (message: Message) => {
     return void message.reply({ embeds: [embed] });
   }
 
-  // ── !setplan ──────────────────────────────
+  // ── .setplan ──────────────────────────────
   if (command === "setplan") {
     if (!isOwner) return message.reply("❌ Owner only.");
     const mention = message.mentions.users.first();
     const plan = args[1]?.toLowerCase();
-    const validPlans = ["free", "starter", "pro", "enterprise"];
-    if (!mention || !validPlans.includes(plan ?? "")) {
-      return void message.reply(`Usage: \`${PREFIX}setplan @user <${validPlans.join("|")}>\``);
+    if (!mention || !VALID_PLANS.includes(plan ?? "")) {
+      return void message.reply(`Usage: \`${PREFIX}setplan @user <${VALID_PLANS.join("|")}>\``);
     }
     await connectDB();
     const user = await UserModel.findOneAndUpdate({ discordId: mention.id }, { plan }, { new: true });
@@ -635,7 +659,7 @@ client.on("interactionCreate", async (interaction) => {
           avatar: btn.user.displayAvatarURL(),
           apiKey,
           balance: 0,
-          plan: "free",
+          plan: "none",
         });
 
         // ── Send DM ─────────────────────────
@@ -650,7 +674,7 @@ client.on("interactionCreate", async (interaction) => {
             `💰 **Credits:** $${newUser.balance.toFixed(2)}\n` +
             `📋 **Plan:** ${newUser.plan}\n\n` +
             `> 🔒 Keep your credentials safe. Never share them.\n` +
-            `> Use \`.credit\` in our server or contact staff to add credits.`
+            `> ⚠️ Your plan is currently **none** — use \`${PREFIX}calc\` to see what you can buy, then ask staff to assign a plan.`
           )
           .setThumbnail(btn.user.displayAvatarURL())
           .setFooter({ text: "MailDrop · " + WEBSITE_URL })
