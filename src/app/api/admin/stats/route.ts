@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
-import User from "@/models/User";
-import Inbox from "@/models/Inbox";
-import Email from "@/models/Email";
-import Transaction from "@/models/Transaction";
+import {
+  findUsers,
+  countUsers,
+  countInboxes,
+  countEmails,
+  totalBalance,
+  findTransactions,
+} from "@/lib/db";
 
 async function requireAdmin(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.isAdmin) {
-    return null;
-  }
+  if (!session?.user?.isAdmin) return null;
   return session;
 }
 
@@ -21,35 +22,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await connectDB();
+  const userCount  = countUsers();
+  const inboxCount = countInboxes({ isActive: true });
+  const emailCount = countEmails();
+  const balance    = totalBalance();
 
-  const [userCount, inboxCount, emailCount, totalBalanceResult] =
-    await Promise.all([
-      User.countDocuments(),
-      Inbox.countDocuments({ isActive: true }),
-      Email.countDocuments(),
-      User.aggregate([{ $group: { _id: null, total: { $sum: "$balance" } } }]),
-    ]);
+  const recentUsers = findUsers()
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5)
+    .map(({ _id, username, discordId, avatar, balance, plan, createdAt }) => ({
+      _id, username, discordId, avatar, balance, plan, createdAt,
+    }));
 
-  const totalBalance = totalBalanceResult[0]?.total || 0;
-
-  const recentUsers = await User.find()
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .select("username discordId avatar balance plan createdAt");
-
-  const recentTransactions = await Transaction.find()
-    .sort({ createdAt: -1 })
-    .limit(10)
-    .populate("userId", "username");
+  const recentTransactions = findTransactions()
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 10)
+    .map(tx => {
+      const user = findUsers({ _id: tx.userId })[0];
+      return { ...tx, userId: user ? { username: user.username } : tx.userId };
+    });
 
   return NextResponse.json({
-    stats: {
-      userCount,
-      inboxCount,
-      emailCount,
-      totalBalance,
-    },
+    stats: { userCount, inboxCount, emailCount, totalBalance: balance },
     recentUsers,
     recentTransactions,
   });

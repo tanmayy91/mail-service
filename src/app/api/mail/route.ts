@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
-import Inbox from "@/models/Inbox";
-import User from "@/models/User";
+import {
+  findUser,
+  findInboxes,
+  createInbox,
+  countInboxes,
+  updateUser,
+} from "@/lib/db";
 import { generateLocalPart } from "@/lib/utils";
 
 const MAIL_DOMAIN = process.env.MAIL_DOMAIN || "mail.example.com";
@@ -10,28 +14,23 @@ const MAIL_DOMAIN = process.env.MAIL_DOMAIN || "mail.example.com";
 // GET /api/mail - list user's inboxes
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Support API key auth
   const apiKey = req.headers.get("x-api-key");
-  let userId = session.user.id;
 
+  let userId: string;
   if (apiKey) {
-    await connectDB();
-    const apiUser = await User.findOne({ apiKey });
+    const apiUser = findUser({ apiKey });
     if (!apiUser) {
       return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
     }
-    userId = apiUser._id.toString();
+    userId = apiUser._id;
+  } else if (session?.user?.id) {
+    userId = session.user.id;
   } else {
-    await connectDB();
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const inboxes = await Inbox.find({ userId, isActive: true }).sort({
-    createdAt: -1,
-  });
+  const inboxes = findInboxes({ userId, isActive: true })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return NextResponse.json({ inboxes });
 }
@@ -41,16 +40,14 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   const apiKey = req.headers.get("x-api-key");
 
-  await connectDB();
-
   let dbUser;
   if (apiKey) {
-    dbUser = await User.findOne({ apiKey });
+    dbUser = findUser({ apiKey });
     if (!dbUser) {
       return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
     }
   } else if (session?.user?.id) {
-    dbUser = await User.findById(session.user.id);
+    dbUser = findUser({ _id: session.user.id });
   } else {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -60,15 +57,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Check plan limits
-  const inboxCount = await Inbox.countDocuments({
-    userId: dbUser._id,
-    isActive: true,
-  });
+  const inboxCount = countInboxes({ userId: dbUser._id, isActive: true });
   const planLimits: Record<string, number> = {
+    none: 0,
     free: 3,
     starter: 10,
     pro: 50,
     enterprise: Infinity,
+    custom: Infinity,
   };
   const limit = planLimits[dbUser.plan] ?? 3;
 
@@ -87,22 +83,24 @@ export async function POST(req: NextRequest) {
   const address = `${localPart}@${domain}`;
 
   // Check if address already exists
-  const exists = await Inbox.findOne({ address });
-  if (exists) {
+  const exists = findInboxes({ address });
+  if (exists.length > 0) {
     return NextResponse.json(
       { error: "Address already taken" },
       { status: 409 }
     );
   }
 
-  const inbox = await Inbox.create({
+  const inbox = createInbox({
     userId: dbUser._id,
     address,
     domain,
     localPart,
+    isActive: true,
+    emailCount: 0,
   });
 
-  await User.findByIdAndUpdate(dbUser._id, { $inc: { inboxCount: 1 } });
+  updateUser(dbUser._id, { inboxCount: (dbUser.inboxCount || 0) + 1 });
 
   return NextResponse.json({ inbox }, { status: 201 });
 }

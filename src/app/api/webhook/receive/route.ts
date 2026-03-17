@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongodb";
-import Email from "@/models/Email";
-import Inbox from "@/models/Inbox";
-import User from "@/models/User";
+import { findUser, findInbox, createEmail, updateInbox, updateUser } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-webhook-secret");
@@ -27,17 +24,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await connectDB();
-
-  const toAddress = Array.isArray(to) ? to[0] : to;
+  const toAddress   = Array.isArray(to) ? to[0] : to;
   const normalizedTo = toAddress.toLowerCase().trim();
 
-  const inbox = await Inbox.findOne({ address: normalizedTo, isActive: true });
+  const inbox = findInbox({ address: normalizedTo, isActive: true });
   if (!inbox) {
     return NextResponse.json({ error: "Inbox not found" }, { status: 404 });
   }
 
-  const emailDoc = await Email.create({
+  const emailDoc = createEmail({
     inboxId: inbox._id,
     userId: inbox.userId,
     from,
@@ -47,13 +42,19 @@ export async function POST(req: NextRequest) {
     text,
     html,
     attachments: attachments || [],
+    isRead: false,
+    isStarred: false,
+    receivedAt: new Date().toISOString(),
     messageId,
     rawHeaders,
-    receivedAt: new Date(),
   });
 
-  await Inbox.findByIdAndUpdate(inbox._id, { $inc: { emailCount: 1 } });
-  await User.findByIdAndUpdate(inbox.userId, { $inc: { emailsReceived: 1 } });
+  updateInbox(inbox._id, { emailCount: (inbox.emailCount || 0) + 1 });
+
+  const owner = findUser({ _id: inbox.userId });
+  if (owner) {
+    updateUser(inbox.userId, { emailsReceived: (owner.emailsReceived || 0) + 1 });
+  }
 
   return NextResponse.json({ success: true, emailId: emailDoc._id });
 }

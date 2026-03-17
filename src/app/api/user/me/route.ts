@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { connectDB } from "@/lib/mongodb";
-import User from "@/models/User";
-import Inbox from "@/models/Inbox";
-import Transaction from "@/models/Transaction";
+import {
+  findUser,
+  updateUser,
+  countInboxes,
+  findTransactions,
+} from "@/lib/db";
 import { generateApiKey } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   const apiKey = req.headers.get("x-api-key");
 
-  await connectDB();
-
   let dbUser;
   if (apiKey) {
-    dbUser = await User.findOne({ apiKey });
+    dbUser = findUser({ apiKey });
     if (!dbUser) {
       return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
     }
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-    dbUser = await User.findById(session.user.id);
+    dbUser = findUser({ _id: session.user.id });
   } else {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -39,20 +39,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const inboxCount = await Inbox.countDocuments({
-    userId: dbUser._id,
-    isActive: true,
-  });
-  const recentTransactions = await Transaction.find({ userId: dbUser._id })
-    .sort({ createdAt: -1 })
-    .limit(5);
+  const inboxCount = countInboxes({ userId: dbUser._id, isActive: true });
+  const recentTransactions = findTransactions({ userId: dbUser._id })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+
+  // Omit password from response
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...safeUser } = dbUser;
 
   return NextResponse.json({
-    user: {
-      ...dbUser.toObject(),
-      inboxCount,
-      recentTransactions,
-    },
+    user: { ...safeUser, inboxCount, recentTransactions },
   });
 }
 
@@ -62,21 +59,15 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await connectDB();
   const body = await req.json().catch(() => ({}));
 
-  const allowedFields: Record<string, boolean> = { username: true };
-  const updateData: Record<string, string> = {};
-
-  for (const key in body) {
-    if (allowedFields[key]) {
-      updateData[key] = body[key];
-    }
+  const allowed = ["username"] as const;
+  const update: Partial<Record<(typeof allowed)[number], string>> = {};
+  for (const key of allowed) {
+    if (key in body) update[key] = body[key];
   }
 
-  const user = await User.findByIdAndUpdate(session.user.id, updateData, {
-    new: true,
-  });
+  const user = updateUser(session.user.id, update);
   return NextResponse.json({ user });
 }
 
@@ -92,13 +83,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
-  await connectDB();
   const newKey = generateApiKey();
-  const user = await User.findByIdAndUpdate(
-    session.user.id,
-    { apiKey: newKey },
-    { new: true }
-  );
+  const user = updateUser(session.user.id, { apiKey: newKey });
 
   return NextResponse.json({ apiKey: user?.apiKey });
 }
