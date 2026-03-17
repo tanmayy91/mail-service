@@ -9,7 +9,7 @@ import {
 } from "@/lib/db";
 import { generateLocalPart } from "@/lib/utils";
 
-const MAIL_DOMAIN = process.env.MAIL_DOMAIN || "mail.example.com";
+const MAIL_DOMAIN = process.env.MAIL_DOMAIN || "novacloud.tech";
 
 // GET /api/mail - list user's inboxes
 export async function GET(req: NextRequest) {
