@@ -8,7 +8,7 @@ import {
   Mail, Users, Inbox, BarChart2, LogOut, DollarSign,
   Search, RefreshCw, Send,
   Shield, Activity, AlertCircle, Check, X,
-  CreditCard,
+  CreditCard, Server, Globe, Database, Plus, Trash2,
 } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { PlanBadge } from "@/components/ui/PlanBadge";
@@ -44,12 +44,41 @@ interface Transaction {
   userId?: { username?: string };
 }
 
+interface MailcowDomain {
+  domain_name: string;
+  description: string;
+  aliases: number;
+  mailboxes: number;
+  max_aliases: number;
+  max_mailboxes: number;
+  active: boolean;
+  created: string;
+}
+
+interface MailcowMailbox {
+  username: string;
+  name: string;
+  domain: string;
+  quota: number;
+  messages: number;
+  active: boolean;
+  created: string;
+}
+
+interface MailcowData {
+  configured: boolean;
+  error?: string;
+  serverInfo?: { version: string; hostname: string } | null;
+  domains?: MailcowDomain[];
+  mailboxes?: MailcowMailbox[];
+}
+
 const SIDEBAR_W = 220;
 
 export default function AdminClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [tab, setTab] = useState<"overview" | "users" | "topup">("overview");
+  const [tab, setTab] = useState<"overview" | "users" | "topup" | "mailcow">("overview");
   const [stats, setStats] = useState<Stats | null>(null);
   const [recentUsers, setRecentUsers] = useState<UserRow[]>([]);
   const [recentTx, setRecentTx] = useState<Transaction[]>([]);
@@ -64,6 +93,19 @@ export default function AdminClient() {
   const [topupNote, setTopupNote] = useState("");
   const [topupLoading, setTopupLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+  // mailcow
+  const [mailcow, setMailcow] = useState<MailcowData | null>(null);
+  const [mcLoading, setMcLoading] = useState(false);
+  // mailcow – new domain form
+  const [mcDomain, setMcDomain] = useState("");
+  const [mcDomainDesc, setMcDomainDesc] = useState("");
+  const [mcDomainLoading, setMcDomainLoading] = useState(false);
+  // mailcow – new mailbox form
+  const [mcMbLocal, setMcMbLocal] = useState("");
+  const [mcMbDomain, setMcMbDomain] = useState("");
+  const [mcMbName, setMcMbName] = useState("");
+  const [mcMbPass, setMcMbPass] = useState("");
+  const [mcMbLoading, setMcMbLoading] = useState(false);
 
   async function fetchStats() {
     const res = await fetch("/api/admin/stats");
@@ -87,6 +129,16 @@ export default function AdminClient() {
     setLoadingUsers(false);
   }
 
+  async function fetchMailcow() {
+    setMcLoading(true);
+    const res = await fetch("/api/admin/mailcow");
+    if (res.ok) {
+      const d = await res.json();
+      setMailcow(d);
+    }
+    setMcLoading(false);
+  }
+
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
     if (status === "authenticated") {
@@ -95,6 +147,11 @@ export default function AdminClient() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  useEffect(() => {
+    if (tab === "mailcow" && !mailcow) fetchMailcow();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   async function handleTopup() {
     const amount = parseFloat(topupAmount);
@@ -152,6 +209,70 @@ export default function AdminClient() {
     }
   }
 
+  async function handleCreateDomain() {
+    if (!mcDomain.trim()) { toast.error("Enter a domain name"); return; }
+    setMcDomainLoading(true);
+    const res = await fetch("/api/admin/mailcow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create_domain", domain: mcDomain.trim(), description: mcDomainDesc.trim() }),
+    });
+    setMcDomainLoading(false);
+    const d = await res.json();
+    if (d.success) {
+      toast.success(`Domain ${mcDomain} created`);
+      setMcDomain(""); setMcDomainDesc("");
+      fetchMailcow();
+    } else {
+      toast.error(d.error ?? "Failed to create domain");
+    }
+  }
+
+  async function handleDeleteDomain(domain: string) {
+    if (!confirm(`Delete domain ${domain}? This cannot be undone.`)) return;
+    const res = await fetch("/api/admin/mailcow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete_domain", domain }),
+    });
+    const d = await res.json();
+    if (d.success) { toast.success(`Domain ${domain} deleted`); fetchMailcow(); }
+    else toast.error(d.error ?? "Failed to delete domain");
+  }
+
+  async function handleCreateMailbox() {
+    if (!mcMbLocal.trim() || !mcMbDomain.trim() || !mcMbName.trim() || !mcMbPass.trim()) {
+      toast.error("All mailbox fields are required"); return;
+    }
+    setMcMbLoading(true);
+    const res = await fetch("/api/admin/mailcow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create_mailbox", localPart: mcMbLocal.trim(), domain: mcMbDomain.trim(), name: mcMbName.trim(), password: mcMbPass }),
+    });
+    setMcMbLoading(false);
+    const d = await res.json();
+    if (d.success) {
+      toast.success(`Mailbox ${mcMbLocal}@${mcMbDomain} created`);
+      setMcMbLocal(""); setMcMbDomain(""); setMcMbName(""); setMcMbPass("");
+      fetchMailcow();
+    } else {
+      toast.error(d.error ?? "Failed to create mailbox");
+    }
+  }
+
+  async function handleDeleteMailbox(address: string) {
+    if (!confirm(`Delete mailbox ${address}? This cannot be undone.`)) return;
+    const res = await fetch("/api/admin/mailcow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete_mailbox", address }),
+    });
+    const d = await res.json();
+    if (d.success) { toast.success(`Mailbox ${address} deleted`); fetchMailcow(); }
+    else toast.error(d.error ?? "Failed to delete mailbox");
+  }
+
   if (status === "loading") {
     return (
       <div style={{ minHeight: "100vh", background: "#0d0d14", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -168,6 +289,7 @@ export default function AdminClient() {
     { id: "overview", icon: <BarChart2 size={16} />, label: "Overview" },
     { id: "users", icon: <Users size={16} />, label: "Users" },
     { id: "topup", icon: <DollarSign size={16} />, label: "Top-up" },
+    { id: "mailcow", icon: <Server size={16} />, label: "Mailcow" },
   ] as const;
 
   return (
@@ -503,6 +625,205 @@ export default function AdminClient() {
                 </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ─── MAILCOW ─── */}
+        {tab === "mailcow" && (
+          <div style={{ padding: 32 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+              <div>
+                <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>Mailcow</h1>
+                <p style={{ color: "#64748b", fontSize: 14, marginTop: 4 }}>Mail server management</p>
+              </div>
+              <button onClick={fetchMailcow} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 9, border: "1px solid #1e1e2e", background: "transparent", color: "#64748b", fontSize: 13, cursor: "pointer" }}>
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+
+            {mcLoading ? (
+              <div style={{ textAlign: "center", padding: 60, color: "#4b5563" }}>
+                <RefreshCw size={24} style={{ animation: "spin 0.8s linear infinite", margin: "0 auto 12px", display: "block" }} />
+                Loading Mailcow data…
+              </div>
+            ) : !mailcow ? null : !mailcow.configured ? (
+              <div style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 14, padding: 24, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <AlertCircle size={18} color="#f87171" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 600, color: "#f87171", marginBottom: 6 }}>Mailcow not configured</div>
+                  <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
+                    Set <code style={{ background: "#1e1e2e", padding: "1px 6px", borderRadius: 4 }}>MAILCOW_URL</code> and{" "}
+                    <code style={{ background: "#1e1e2e", padding: "1px 6px", borderRadius: 4 }}>MAILCOW_API_KEY</code> environment variables to enable Mailcow integration.
+                    Inboxes will still work via the IMAP catch-all; Mailcow aliases just won&apos;t be provisioned automatically.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Server status card */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 32 }}>
+                  <StatCard
+                    label="Server"
+                    value={mailcow.serverInfo?.hostname?.replace(/^https?:\/\//, "") ?? "—"}
+                    icon={<Server size={18} />}
+                    color="#7c3aed"
+                  />
+                  <StatCard
+                    label="Version"
+                    value={mailcow.serverInfo?.version ?? "—"}
+                    icon={<Activity size={18} />}
+                    color="#10b981"
+                  />
+                  <StatCard
+                    label="Domains"
+                    value={mailcow.domains?.length ?? 0}
+                    icon={<Globe size={18} />}
+                    color="#5865f2"
+                  />
+                  <StatCard
+                    label="Mailboxes"
+                    value={mailcow.mailboxes?.length ?? 0}
+                    icon={<Database size={18} />}
+                    color="#f59e0b"
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 32 }}>
+                  {/* ── Domains list ── */}
+                  <div style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 16, overflow: "hidden" }}>
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 8 }}>
+                        <Globe size={15} color="#5865f2" /> Domains
+                      </h3>
+                    </div>
+                    {(mailcow.domains ?? []).length === 0 ? (
+                      <div style={{ padding: 24, textAlign: "center", color: "#4b5563", fontSize: 14 }}>No domains</div>
+                    ) : (
+                      (mailcow.domains ?? []).map((d) => (
+                        <div key={d.domain_name} style={{ padding: "12px 20px", borderBottom: "1px solid #0d0d14", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{d.domain_name}</div>
+                            <div style={{ fontSize: 11, color: "#4b5563" }}>{d.mailboxes}/{d.max_mailboxes} mailboxes · {d.aliases}/{d.max_aliases} aliases</div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 100, background: d.active ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.1)", color: d.active ? "#34d399" : "#f87171" }}>
+                              {d.active ? "Active" : "Off"}
+                            </span>
+                            <button onClick={() => handleDeleteDomain(d.domain_name)} title="Delete domain" style={{ width: 26, height: 26, borderRadius: 7, border: "1px solid rgba(239,68,68,0.3)", background: "transparent", cursor: "pointer", color: "#f87171", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* ── Mailboxes list ── */}
+                  <div style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 16, overflow: "hidden" }}>
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e1e2e" }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9", display: "flex", alignItems: "center", gap: 8 }}>
+                        <Database size={15} color="#f59e0b" /> Mailboxes
+                      </h3>
+                    </div>
+                    {(mailcow.mailboxes ?? []).length === 0 ? (
+                      <div style={{ padding: 24, textAlign: "center", color: "#4b5563", fontSize: 14 }}>No mailboxes</div>
+                    ) : (
+                      (mailcow.mailboxes ?? []).map((mb) => (
+                        <div key={mb.username} style={{ padding: "12px 20px", borderBottom: "1px solid #0d0d14", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{mb.username}</div>
+                            <div style={{ fontSize: 11, color: "#4b5563" }}>{mb.name} · {mb.messages} msgs · {mb.quota} MB quota</div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 100, background: mb.active ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.1)", color: mb.active ? "#34d399" : "#f87171" }}>
+                              {mb.active ? "Active" : "Off"}
+                            </span>
+                            <button onClick={() => handleDeleteMailbox(mb.username)} title="Delete mailbox" style={{ width: 26, height: 26, borderRadius: 7, border: "1px solid rgba(239,68,68,0.3)", background: "transparent", cursor: "pointer", color: "#f87171", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Create forms ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                  {/* Create domain */}
+                  <div style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 16, padding: 24 }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
+                      <Plus size={15} color="#5865f2" /> Add Domain
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>Domain name</label>
+                        <input value={mcDomain} onChange={(e) => setMcDomain(e.target.value)} placeholder="example.com"
+                          style={{ width: "100%", background: "#0d0d14", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 12px", color: "#e2e8f0", fontSize: 13, outline: "none" }}
+                          onFocus={(e) => (e.target.style.borderColor = "#7c3aed")} onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>Description (optional)</label>
+                        <input value={mcDomainDesc} onChange={(e) => setMcDomainDesc(e.target.value)} placeholder="My mail domain"
+                          style={{ width: "100%", background: "#0d0d14", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 12px", color: "#e2e8f0", fontSize: 13, outline: "none" }}
+                          onFocus={(e) => (e.target.style.borderColor = "#7c3aed")} onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                        />
+                      </div>
+                      <button onClick={handleCreateDomain} disabled={mcDomainLoading}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px", borderRadius: 10, border: "none", background: mcDomainLoading ? "#1e1e2e" : "linear-gradient(135deg, #5865f2, #4752c4)", color: mcDomainLoading ? "#4b5563" : "white", fontWeight: 600, fontSize: 14, cursor: mcDomainLoading ? "not-allowed" : "pointer" }}>
+                        {mcDomainLoading ? <RefreshCw size={14} style={{ animation: "spin 0.8s linear infinite" }} /> : <Plus size={14} />}
+                        {mcDomainLoading ? "Creating…" : "Create Domain"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Create mailbox */}
+                  <div style={{ background: "#13131f", border: "1px solid #1e1e2e", borderRadius: 16, padding: 24 }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
+                      <Plus size={15} color="#f59e0b" /> Add Mailbox
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>Local part</label>
+                          <input value={mcMbLocal} onChange={(e) => setMcMbLocal(e.target.value)} placeholder="user"
+                            style={{ width: "100%", background: "#0d0d14", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 12px", color: "#e2e8f0", fontSize: 13, outline: "none" }}
+                            onFocus={(e) => (e.target.style.borderColor = "#7c3aed")} onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>Domain</label>
+                          <input value={mcMbDomain} onChange={(e) => setMcMbDomain(e.target.value)} placeholder="example.com"
+                            style={{ width: "100%", background: "#0d0d14", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 12px", color: "#e2e8f0", fontSize: 13, outline: "none" }}
+                            onFocus={(e) => (e.target.style.borderColor = "#7c3aed")} onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>Display name</label>
+                        <input value={mcMbName} onChange={(e) => setMcMbName(e.target.value)} placeholder="John Doe"
+                          style={{ width: "100%", background: "#0d0d14", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 12px", color: "#e2e8f0", fontSize: 13, outline: "none" }}
+                          onFocus={(e) => (e.target.style.borderColor = "#7c3aed")} onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>Password</label>
+                        <input type="password" value={mcMbPass} onChange={(e) => setMcMbPass(e.target.value)} placeholder="••••••••"
+                          style={{ width: "100%", background: "#0d0d14", border: "1px solid #1e1e2e", borderRadius: 9, padding: "9px 12px", color: "#e2e8f0", fontSize: 13, outline: "none" }}
+                          onFocus={(e) => (e.target.style.borderColor = "#7c3aed")} onBlur={(e) => (e.target.style.borderColor = "#1e1e2e")}
+                        />
+                      </div>
+                      <button onClick={handleCreateMailbox} disabled={mcMbLoading}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px", borderRadius: 10, border: "none", background: mcMbLoading ? "#1e1e2e" : "linear-gradient(135deg, #f59e0b, #d97706)", color: mcMbLoading ? "#4b5563" : "white", fontWeight: 600, fontSize: 14, cursor: mcMbLoading ? "not-allowed" : "pointer" }}>
+                        {mcMbLoading ? <RefreshCw size={14} style={{ animation: "spin 0.8s linear infinite" }} /> : <Plus size={14} />}
+                        {mcMbLoading ? "Creating…" : "Create Mailbox"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </main>

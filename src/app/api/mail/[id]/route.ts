@@ -8,6 +8,7 @@ import {
   updateUser,
   deleteEmailsByInbox,
 } from "@/lib/db";
+import { deleteAlias, isMailcowConfigured } from "@/lib/mailcow";
 
 // GET /api/mail/[id] - get emails for an inbox
 export async function GET(
@@ -84,6 +85,11 @@ export async function DELETE(
   const owner = findUser({ _id: inbox.userId });
   if (owner) {
     updateUser(owner._id, { inboxCount: Math.max(0, (owner.inboxCount || 1) - 1) });
+  }
+
+  // Remove alias from Mailcow (best-effort).
+  if (isMailcowConfigured()) {
+    await deleteAlias(inbox.address).catch(() => null);
   }
 
   return NextResponse.json({ success: true });
