@@ -732,7 +732,7 @@ export default function AdminClient() {
                         <div key={mb.username} style={{ padding: "12px 20px", borderBottom: "1px solid #0d0d14", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>{mb.username}</div>
-                            <div style={{ fontSize: 11, color: "#4b5563" }}>{mb.name} · {mb.messages} msgs · {Math.round(mb.quota / 1024)} MB quota</div>
+                            <div style={{ fontSize: 11, color: "#4b5563" }}>{mb.name} · {mb.messages} msgs · {mb.quota} MB quota</div>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 100, background: mb.active ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.1)", color: mb.active ? "#34d399" : "#f87171" }}>

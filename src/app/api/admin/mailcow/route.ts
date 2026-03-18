@@ -94,7 +94,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "domain is required" }, { status: 400 });
       }
       const ok = await deleteDomain(domain);
-      return NextResponse.json({ success: ok }, ok ? undefined : { status: 502 });
+      if (!ok) return NextResponse.json({ success: false, error: "Mailcow returned an error — check the domain exists" }, { status: 500 });
+      return new NextResponse(null, { status: 204 });
     }
 
     case "create_mailbox": {
@@ -121,7 +122,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "address is required" }, { status: 400 });
       }
       const ok = await deleteMailbox(address);
-      return NextResponse.json({ success: ok }, ok ? undefined : { status: 502 });
+      if (!ok) return NextResponse.json({ success: false, error: "Mailcow returned an error — check the address exists" }, { status: 500 });
+      return new NextResponse(null, { status: 204 });
     }
 
     default:
