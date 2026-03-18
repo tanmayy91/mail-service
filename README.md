@@ -1,6 +1,6 @@
 # MailDrop 📬
 
-Disposable email service with Discord bot account creation, REST API, and admin panel.
+Disposable email service with Discord bot account creation, REST API, admin panel, and Mailcow integration.
 
 **Live site:** https://gootephode.me
 
@@ -11,7 +11,8 @@ Disposable email service with Discord bot account creation, REST API, and admin 
 - **Email / password login** — accounts created exclusively via the Discord bot
 - **Discord Bot** — registration ticket system, TOS acceptance, balance top-ups
 - **Dashboard** — create inboxes, read emails, manage API key
-- **Admin Panel** — view stats, manage users, top-up balances
+- **Admin Panel** — view stats, manage users, top-up balances, manage Mailcow server
+- **Mailcow Integration** — auto-provision email aliases on your Mailcow server when inboxes are created; manage domains and mailboxes from the admin panel
 - **REST API** — full programmatic access with API key auth
 - **Railway-ready** — two services (web + bot) from one repo
 
@@ -19,14 +20,15 @@ Disposable email service with Discord bot account creation, REST API, and admin 
 
 ## Stack
 
-| Layer     | Tech                              |
-|-----------|-----------------------------------|
-| Frontend  | Next.js 15 · TailwindCSS · Lucide |
-| Backend   | Next.js API Routes                |
-| Auth      | NextAuth v5 (Credentials)         |
-| Database  | MongoDB (Mongoose)                |
-| Bot       | discord.js v14                    |
-| Deploy    | Railway.com                       |
+| Layer     | Tech                                      |
+|-----------|-------------------------------------------|
+| Frontend  | Next.js 16 · TailwindCSS · Lucide         |
+| Backend   | Next.js API Routes                        |
+| Auth      | NextAuth v5 (Credentials)                 |
+| Database  | JSON file (`data/db.json`)                |
+| Mail      | Mailcow (self-hosted) + IMAP catch-all    |
+| Bot       | discord.js v14                            |
+| Deploy    | Railway.com                               |
 
 ---
 
@@ -139,4 +141,64 @@ To receive actual emails on `mail.gootephode.me`:
 2. Configure your mail server to forward to `POST /api/webhook/receive` with the
    JSON payload `{ to, from, subject, text, html }`
 3. Secure the webhook with the `WEBHOOK_SECRET` env var (add to the route handler)
+
+---
+
+## Mailcow Integration
+
+[Mailcow](https://mailcow.email) is a Dockerized mail-server suite with a built-in admin UI and REST API.
+MailDrop integrates with it so that **every inbox you create automatically gets a Mailcow alias**, routing
+incoming mail to the catch-all mailbox that the IMAP service polls.
+
+### Setup
+
+1. Deploy Mailcow on your server following [the official docs](https://docs.mailcow.email/).
+2. In Mailcow → **Configuration → Access → API**, create a read/write API key.
+3. Set environment variables:
+
+| Variable           | Value                                      |
+|--------------------|--------------------------------------------|
+| `MAILCOW_URL`      | Base URL of your instance, e.g. `https://mail.example.com` |
+| `MAILCOW_API_KEY`  | API key from Mailcow Configuration → Access → API |
+
+Both variables must be set; if either is missing MailDrop degrades gracefully (inboxes still work via the IMAP catch-all, aliases just aren't auto-provisioned).
+
+### Admin Panel — Mailcow Tab
+
+Navigate to `/admin` and click **Mailcow** in the left sidebar.  You'll see:
+
+- **Server info** — Mailcow version & hostname
+- **Domains** — list with alias/mailbox counts; delete button
+- **Mailboxes** — list with quota/message count; delete button
+- **Add Domain** — create a new domain on your Mailcow instance
+- **Add Mailbox** — create a new mailbox (local part, domain, display name, password)
+
+### Admin API Routes
+
+All routes require an admin session.
+
+| Method | Endpoint              | Description                  |
+|--------|-----------------------|------------------------------|
+| GET    | `/api/admin/mailcow`  | Server info, domains, mailboxes |
+| POST   | `/api/admin/mailcow`  | Manage Mailcow (see body actions below) |
+
+**POST body actions:**
+
+```json
+// Create a domain
+{ "action": "create_domain", "domain": "example.com", "description": "optional" }
+
+// Delete a domain
+{ "action": "delete_domain", "domain": "example.com" }
+
+// Create a mailbox
+{ "action": "create_mailbox", "localPart": "user", "domain": "example.com", "name": "Display Name", "password": "secret", "quotaMb": 1024 }
+
+// Delete a mailbox
+{ "action": "delete_mailbox", "address": "user@example.com" }
+```
+
+### Self-signed TLS
+
+If your Mailcow instance uses a self-signed certificate, set `NODE_TLS_REJECT_UNAUTHORIZED=0` in your environment. Do **not** do this in production with a public-facing service.
 
